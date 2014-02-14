@@ -82,6 +82,14 @@ which_bucket <- function(y, fiver) {
 
 
 shinyServer(function(input, output, session) {
+   ### Render Image
+  output$futurama <- renderText ({
+    image_path = "http://cf-public-view.s3.amazonaws.com/coolstuff/fry_not_sure_if.png"
+    html_image = paste("<img src=", image_path, " width=\"75%\"/>", sep="")
+    paste(html_image)
+    
+   })
+
   ### read in file    
   full_file <- reactive({
     if (is.na(input$files[1])) {
