@@ -11,6 +11,7 @@ shinyUI(pageWithSidebar(
   
   
   sidebarPanel(
+    htmlOutput("futurama"),
     fileInput("files", h4("Select a full report:"), multiple=FALSE, 
               accept=c('text/csv', 'text/comma-separated-values,text/plain', '.csv')),
     h4("***"),
