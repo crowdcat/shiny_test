@@ -1,8 +1,8 @@
 ###contributor_profile_tab
-###outstanding: graph titles, clickable burninator links, comparison graphs
-###better error messaging (missing golds, blank columns) broaden last submit options
+###outstanding: graph titles, comparison graphs
+### broaden last submit options
 ###add 'show me more' options in table, more contrib grouping options.
-### Last updated 02/11/2014
+### Last updated 02/13/2014
 
 require('shiny')
 require('datasets')
@@ -370,7 +370,7 @@ shinyServer(function(input, output, session) {
         num_shown = min(total_workers_trust, 100)
         puts <- c("Graph showing",num_shown, "out of", total_workers_trust, "workers")
       }
-      if (input$num_chosen == 'all'){
+      if (input$num_chosen == 'all' || total_workers_trust < 50){
         puts <- c("Graph showing", total_workers_trust, "total workers")
       }
       h4(puts)
