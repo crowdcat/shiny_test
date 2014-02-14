@@ -12,6 +12,7 @@ shinyUI(pageWithSidebar(
   
   
   sidebarPanel(
+    htmlOutput("futurama"),
     fileInput("files", h4("Select a full report:"), multiple=FALSE, 
               accept=c('text/csv', 'text/comma-separated-values,text/plain', '.csv')),
     h4("***"),
@@ -59,6 +60,7 @@ shinyUI(pageWithSidebar(
                h4("Answer Distros"),
                uiOutput("profileQuestionSelector"),
                showOutput("profile_units_distros", "nvd3"),
+               br(),
                h4("Total Number of Golds"),
                uiOutput("profileGoldCount"),
                h4("Golds Seen"),
@@ -111,14 +113,14 @@ shinyUI(pageWithSidebar(
       tabPanel("Scambot: Burninator", downloadButton('downloadData', 'Flag these workers'),
                htmlOutput("offenders"),
                p(),
-               p("Burminator How-to:"),
+               p("Burninator How-to:"),
                p("You can click on blue ids under X_worker_id to see the workers' profile pages in the platform."),
-               p("All times on this page (max_offense_time and min_offense_time) are in fractions of a second. So \"5.53\" is 5 seconds 53 hundreds of a second.")
+               p("All times on this page (max_assignment_time and min_assignment_time) are in fractions of a second. So \"5.53\" is 5 seconds 53 hundreds of a second.")
       )
       #    ) 
     )
   )        
-))
+))  
 
 
 

@@ -1,8 +1,7 @@
-###contributor_profile_tab
-###outstanding: graph titles, clickable burninator links, comparison graphs
-###better error messaging (missing golds, blank columns) broaden last submit options
-###add 'show me more' options in table, more contrib grouping options.
-### Last updated 02/11/2014
+###contributors
+###outstanding: comparison graphs, broaden last submit options
+###more contrib grouping options, DB pulls.
+### Last updated 02/13/2014
 
 require('shiny')
 require('datasets')
@@ -83,6 +82,14 @@ which_bucket <- function(y, fiver) {
 
 
 shinyServer(function(input, output, session) {
+   ### Render Image
+  output$futurama <- renderText ({
+    image_path = "http://cf-public-view.s3.amazonaws.com/coolstuff/fry_not_sure_if.png"
+    html_image = paste("<img src=", image_path, " width=\"75%\"/>", sep="")
+    paste(html_image)
+    
+   })
+
   ### read in file    
   full_file <- reactive({
     if (is.na(input$files[1])) {
@@ -172,7 +179,8 @@ shinyServer(function(input, output, session) {
     } else {
       inFile <- input$files$name
       job_id = gsub(inFile, pattern="^f", replacement="")
-      job_id = gsub(job_id, pattern="\\.csv", replacement="")
+      job_id = str_extract(job_id, "\\d{6}")
+      #job_id = gsub(job_id, pattern="\\.csv", replacement="")
       return(job_id)
     }
   })
@@ -361,7 +369,7 @@ shinyServer(function(input, output, session) {
     } else {
       workers_text = agg_by_worker()
       total_workers_trust = length(workers_text$trust)
-
+      
       if (input$num_chosen == 'fiddy'){
         num_shown = min(total_workers_trust, 50)
         puts <- c("Graph showing",num_shown, "out of", total_workers_trust, "workers")
@@ -370,7 +378,7 @@ shinyServer(function(input, output, session) {
         num_shown = min(total_workers_trust, 100)
         puts <- c("Graph showing",num_shown, "out of", total_workers_trust, "workers")
       }
-      if (input$num_chosen == 'all'){
+      if (input$num_chosen == 'all' || total_workers_trust > 50){
         puts <- c("Graph showing", total_workers_trust, "total workers")
       }
       h4(puts)
@@ -1154,6 +1162,7 @@ shinyServer(function(input, output, session) {
                   group = 'group', type='multiBarChart', dom='plot_distros', width=800, margin=60, overflow="visible") 
       
       p3$xAxis(rotateLabels=45)
+      p3$xAxis(axisLabel='Worker Responses')
       p3$chart(reduceXTicks = FALSE)
       p3
     }
@@ -1209,7 +1218,9 @@ shinyServer(function(input, output, session) {
         
         p2 <- nPlot(numbers ~ questions, data=responses_table_transformed, group = 'group',
                     type='multiBarChart', dom='profile_units_distros') 
+        x_label = paste('Answers from', input$id_chosen_profiles, sep=" ")
         p2$xAxis(rotateLabels=45)
+        p2$xAxis(axisLabel=x_label)
         p2$chart(reduceXTicks = FALSE)
         p2
         
@@ -1231,7 +1242,7 @@ shinyServer(function(input, output, session) {
       answer_cols_names = names(full_file)[answer_cols]
       answer_cols_names = gsub(answer_cols_names, pattern=".\\gold", replacement="")
       
-      profile_chosen_q = input$profile_question_chosen
+      profile_chosen_q = input$profile_question_chosen_golds
       question_index = which(answer_cols_names == profile_chosen_q)
       
       
@@ -1254,7 +1265,12 @@ shinyServer(function(input, output, session) {
       
       p4 <- nPlot(numbers ~ questions, data=responses_table_transformed, group = 'group',
                   type='multiBarChart', dom='profile_golds_distros') 
+      
+      x_label = paste('Answers on Golds from', input$id_chosen_profiles, sep=" ")
+      
       p4$xAxis(rotateLabels=45)
+      
+      p4$xAxis(axisLabel= x_label)
       p4$chart(reduceXTicks = FALSE)
       p4
     }
@@ -1358,6 +1374,8 @@ shinyServer(function(input, output, session) {
     print("probs about to break")
     thou_dost_offend_me = ddply(df, .(X_worker_id), summarize,
                                 ip = X_ip[1],
+                                location = paste(X_city[1], X_country[1], sep=", "),
+                                channel = X_channel[1],
                                 min_assignment_time = min(time_duration),
                                 max_assignment_time = max(time_duration),
                                 num_judgments = length(time_duration),
@@ -1421,4 +1439,3 @@ shinyServer(function(input, output, session) {
   
   
 })
-
