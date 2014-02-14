@@ -1373,6 +1373,8 @@ shinyServer(function(input, output, session) {
     print("probs about to break")
     thou_dost_offend_me = ddply(df, .(X_worker_id), summarize,
                                 ip = X_ip[1],
+                                location = paste(X_city[1], X_country[1], sep=", "),
+                                channel = X_channel[1],
                                 min_assignment_time = min(time_duration),
                                 max_assignment_time = max(time_duration),
                                 num_judgments = length(time_duration),
