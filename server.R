@@ -179,7 +179,8 @@ shinyServer(function(input, output, session) {
     } else {
       inFile <- input$files$name
       job_id = gsub(inFile, pattern="^f", replacement="")
-      job_id = gsub(job_id, pattern="\\.csv", replacement="")
+      job_id = str_extract(job_id, "\\d{6}")
+      #job_id = gsub(job_id, pattern="\\.csv", replacement="")
       return(job_id)
     }
   })
