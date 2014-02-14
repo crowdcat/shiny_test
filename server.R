@@ -1241,7 +1241,7 @@ shinyServer(function(input, output, session) {
       answer_cols_names = names(full_file)[answer_cols]
       answer_cols_names = gsub(answer_cols_names, pattern=".\\gold", replacement="")
       
-      profile_chosen_q = input$profile_question_chosen
+      profile_chosen_q = input$profile_question_chosen_golds
       question_index = which(answer_cols_names == profile_chosen_q)
       
       
