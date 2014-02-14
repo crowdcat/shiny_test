@@ -1,7 +1,6 @@
-###contributor_profile_tab
-###outstanding: graph titles, comparison graphs
-### broaden last submit options
-###add 'show me more' options in table, more contrib grouping options.
+###contributors
+###outstanding: comparison graphs, broaden last submit options
+###more contrib grouping options, DB pulls.
 ### Last updated 02/13/2014
 
 require('shiny')
@@ -361,7 +360,7 @@ shinyServer(function(input, output, session) {
     } else {
       workers_text = agg_by_worker()
       total_workers_trust = length(workers_text$trust)
-
+      
       if (input$num_chosen == 'fiddy'){
         num_shown = min(total_workers_trust, 50)
         puts <- c("Graph showing",num_shown, "out of", total_workers_trust, "workers")
@@ -370,7 +369,7 @@ shinyServer(function(input, output, session) {
         num_shown = min(total_workers_trust, 100)
         puts <- c("Graph showing",num_shown, "out of", total_workers_trust, "workers")
       }
-      if (input$num_chosen == 'all' || total_workers_trust < 50){
+      if (input$num_chosen == 'all' || total_workers_trust > 50){
         puts <- c("Graph showing", total_workers_trust, "total workers")
       }
       h4(puts)
@@ -1154,6 +1153,7 @@ shinyServer(function(input, output, session) {
                   group = 'group', type='multiBarChart', dom='plot_distros', width=800, margin=60, overflow="visible") 
       
       p3$xAxis(rotateLabels=45)
+      p3$xAxis(axisLabel='Worker Responses')
       p3$chart(reduceXTicks = FALSE)
       p3
     }
@@ -1209,7 +1209,9 @@ shinyServer(function(input, output, session) {
         
         p2 <- nPlot(numbers ~ questions, data=responses_table_transformed, group = 'group',
                     type='multiBarChart', dom='profile_units_distros') 
+        x_label = paste('Answers from', input$id_chosen_profiles, sep=" ")
         p2$xAxis(rotateLabels=45)
+        p2$xAxis(axisLabel=x_label)
         p2$chart(reduceXTicks = FALSE)
         p2
         
@@ -1254,7 +1256,12 @@ shinyServer(function(input, output, session) {
       
       p4 <- nPlot(numbers ~ questions, data=responses_table_transformed, group = 'group',
                   type='multiBarChart', dom='profile_golds_distros') 
+      
+      x_label = paste('Answers on Golds from', input$id_chosen_profiles, sep=" ")
+      
       p4$xAxis(rotateLabels=45)
+      
+      p4$xAxis(axisLabel= x_label)
       p4$chart(reduceXTicks = FALSE)
       p4
     }
@@ -1421,4 +1428,3 @@ shinyServer(function(input, output, session) {
   
   
 })
-
