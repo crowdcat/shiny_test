@@ -90,22 +90,34 @@ shinyServer(function(input, output, session) {
     
    })
 
-  ### read in file    
-  full_file <- reactive({
+  ### read in file 
+  full_file_raw <- reactive({
     if (is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
       inFile <- input$files
       full_file = read.csv(inFile$datapath, na.strings="NaN", stringsAsFactors=FALSE)
-      full_file$X_created_at = as.POSIXct(full_file$X_created_at,
-                                          format='%m/%d/%Y %H:%M:%S')
       if (!("X_tainted" %in% names(full_file))) {
         full_file$X_tainted = "false"
       }
       if (!("X_golden" %in% names(full_file))) {
         full_file$X_golden = "false"
       }
+      return(full_file)
+    }
+  })
+  
+  
+  full_file <- reactive({
+    if (is.na(input$files[1])) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      full_file = full_file_raw()
+      full_file$X_created_at_scambot = full_file$X_created_at
+      full_file$X_created_at = as.POSIXct(full_file$X_created_at,
+                                          format='%m/%d/%Y %H:%M:%S')
       return(full_file)
     }
   })
@@ -1318,8 +1330,8 @@ shinyServer(function(input, output, session) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      inFile <- input$files
-      full_file = read.csv(inFile$datapath, na.strings="NaN", stringsAsFactors=FALSE)
+      full_file = full_file()
+      full_file$X_created_at = full_file$X_created_at_scambot
       full_file = add.times(full_file)
       return(full_file)
     }
