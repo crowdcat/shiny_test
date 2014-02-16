@@ -1377,6 +1377,9 @@ shinyServer(function(input, output, session) {
     threshold = input$threshold
     print("Defined threshold, about to subset in Burminator")
     df_under=df[which(df$time_duration_log<threshold),c("X_worker_id","X_ip", "time_duration")]
+    if (nrow(df_under)==0) {
+      return(NULL)
+    }
     print("Subsetted judgments, about to subset workers in Burminator")
     df = df[df$X_worker_id %in% df_under$X_worker_id,]
     df$is_under_line = df$time_duration_log < threshold
