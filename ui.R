@@ -12,7 +12,6 @@ shinyUI(pageWithSidebar(
   
   
   sidebarPanel(
-    htmlOutput("futurama"),
     fileInput("files", h4("Select a full report:"), multiple=FALSE, 
               accept=c('text/csv', 'text/comma-separated-values,text/plain', '.csv')),
     h4("***"),
@@ -28,6 +27,7 @@ shinyUI(pageWithSidebar(
     ),
     uiOutput("scambotSelector"),
     htmlOutput("summary_message"),
+    htmlOutput("futurama"),
     tags$style(type="text/css", ".tab-content { overflow: visible; }", "svg { height: 150%; }")
   ),
   mainPanel(
