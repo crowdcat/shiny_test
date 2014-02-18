@@ -31,7 +31,7 @@ shinyServer(function(input, output, session) {
   
   ### read in file 
   full_file_raw <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -43,7 +43,7 @@ shinyServer(function(input, output, session) {
   
   # add new columnds to full file like assignment durection and last submission
   full_file <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -75,7 +75,7 @@ shinyServer(function(input, output, session) {
   
   # this function subsets full_file by left bar controls (Selector for left panel!)
   subsetted_file <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {    
@@ -146,7 +146,7 @@ shinyServer(function(input, output, session) {
   
   ##Get Job ID from name of input file
   job_id <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -160,7 +160,7 @@ shinyServer(function(input, output, session) {
   
   ### this function gets a single row for every worker to display in contributor table by id
   agg_by_worker <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -183,7 +183,7 @@ shinyServer(function(input, output, session) {
   
   # matches the functionality of agg_by_worker; note that the actual subsetting is done later
   agg_by_ip <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -207,7 +207,7 @@ shinyServer(function(input, output, session) {
   
   # obtains the slice of the data frame that refers to a particular id
   full_file_contrib_id <- reactive({
-    if (is.na(input$files[1]) || input$id_chosen_profiles=="") {
+    if (is.null(input$files[1]) || is.na(input$files[1]) || input$id_chosen_profiles=="") {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -223,7 +223,7 @@ shinyServer(function(input, output, session) {
   
   ###Used to record golds and units worked on, as well as contributor location info
   distros <-reactive({
-    if (is.na(input$files[1])){
+    if (is.null(input$files[1]) || is.na(input$files[1])){
       return(NULL)
     } else{
       full_file_distros = full_file()
@@ -244,7 +244,7 @@ shinyServer(function(input, output, session) {
   ### To Collect Gold Cols and Answers
   # grabs names of gold columns, removes "_gold" and returns question names
   full_file_gold_answers <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -260,7 +260,7 @@ shinyServer(function(input, output, session) {
   ##SIDEBAR PANEL###
   output$trustSelector <- renderUI({
     print(input$files)
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -274,7 +274,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$countrySelector <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -287,7 +287,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$channelSelector <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -301,7 +301,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$timeSelector <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -321,7 +321,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$judgSelector <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -356,7 +356,7 @@ shinyServer(function(input, output, session) {
   
   
   output$scambotSelector <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -379,7 +379,7 @@ shinyServer(function(input, output, session) {
   ###Contributor ID Table  
   
   output$titleTextContributors <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -399,7 +399,7 @@ shinyServer(function(input, output, session) {
   
   ### Worker Graph 
   output$titleTextGraph <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -422,7 +422,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$titleTextIp <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -443,7 +443,7 @@ shinyServer(function(input, output, session) {
   ### Answer Distros
   
   output$questionSelector <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -455,7 +455,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$titleDistrosUnits <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -480,7 +480,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$titleDistrosJudgs <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -507,7 +507,7 @@ shinyServer(function(input, output, session) {
   ###Individual Contributor Profile Page
   ###Give total units worked on
   output$profileUnitCount <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -525,7 +525,7 @@ shinyServer(function(input, output, session) {
   
   ###Show which golds they worked on
   profile_golds <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -547,7 +547,7 @@ shinyServer(function(input, output, session) {
   
   ##Gold Distros
   output$goldAnswers <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -559,7 +559,7 @@ shinyServer(function(input, output, session) {
   
   ###Give total golds worked on
   output$profileGoldCount <- renderUI({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -576,7 +576,7 @@ shinyServer(function(input, output, session) {
   
   ###Show which units they worked on
   profile_units <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -600,7 +600,7 @@ shinyServer(function(input, output, session) {
   
   ###Select Which Distributions To look at
   output$profileQuestionSelector <- renderUI({
-    if (is.na(input$files[1]) || input$id_chosen_profiles=="") {
+    if (is.null(input$files[1]) || is.na(input$files[1]) || input$id_chosen_profiles=="") {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -612,7 +612,7 @@ shinyServer(function(input, output, session) {
   })
   ###Select Which Distributions to Look at for Golds 
   output$profileQuestionSelectorGolds <- renderUI({
-    if (is.na(input$files[1]) || input$id_chosen_profiles =="") {
+    if (is.null(input$files[1]) || is.na(input$files[1]) || input$id_chosen_profiles =="") {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -627,7 +627,7 @@ shinyServer(function(input, output, session) {
   ##By Contributor ID
   output$create_html_table <- renderText({
     job_id = job_id()
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -683,7 +683,7 @@ shinyServer(function(input, output, session) {
   
   ##By worker IP
   output$create_html_table_ip <- renderText({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -725,7 +725,7 @@ shinyServer(function(input, output, session) {
   ###Create Single Profile Table of a contributor
   output$create_profile_table <- renderText({
     job_id = job_id()
-    if (is.na(input$files[1]) || input$id_chosen_profiles == "") {
+    if (is.null(input$files[1]) || is.na(input$files[1]) || input$id_chosen_profiles == "") {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -780,7 +780,7 @@ shinyServer(function(input, output, session) {
   ##Create Clickable links to units on the profile page, under units seen.
   output$create_unit_links <- renderText({
     job_id = job_id()
-    if (is.na(input$files[1]) || input$id_chosen_profiles=="") {
+    if (is.null(input$files[1]) || is.na(input$files[1]) || input$id_chosen_profiles=="") {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -812,7 +812,7 @@ shinyServer(function(input, output, session) {
   ###Create Clickable links for golds on profile page. 
   output$create_gold_links <- renderText({
     job_id = job_id()
-    if (is.na(input$files[1]) || input$id_chosen_profiles=="") {
+    if (is.null(input$files[1]) || is.na(input$files[1]) || input$id_chosen_profiles=="") {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -848,7 +848,7 @@ shinyServer(function(input, output, session) {
   
   #### Contributor Table Reacts to Functions Inputs is loaded in create_html_table #### 
   live_worker_table <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {    
@@ -913,7 +913,7 @@ shinyServer(function(input, output, session) {
   
   ### IP Table Reacts to Same Inputs As Contributor Table loaded into create_html_table_ip 
   live_worker_table_ip <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else { 
@@ -1032,7 +1032,7 @@ shinyServer(function(input, output, session) {
   ##General Plot of contributor table, sortable.
   
   get_worker_table <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else { 
@@ -1055,7 +1055,7 @@ shinyServer(function(input, output, session) {
   
   output$plot_workers <- renderChart({
     print("Calling the Plot Workers Chart")
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else { 
@@ -1095,7 +1095,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$plot_distros <- renderChart({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1156,7 +1156,7 @@ shinyServer(function(input, output, session) {
   ###Individual Contributor Unit Distributions
   output$profile_units_distros <- renderChart({
     #full_file_unit_answers <- reactive(function(){
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       #return(NULL)
       
@@ -1216,7 +1216,7 @@ shinyServer(function(input, output, session) {
   ###Individual Contributor Gold Distributions
   output$profile_golds_distros <- renderChart({
     #full_file_unit_answers <- reactive(function(){
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1265,7 +1265,7 @@ shinyServer(function(input, output, session) {
   
   ############### this part controls displaying the stats ###############
   output$summary_message <- renderText({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return("<p>You have not uploaded any files yet</p>")
     } else {
@@ -1300,7 +1300,7 @@ shinyServer(function(input, output, session) {
   ################################ here comes scambot ##########################################
   
   premade_scambot_plot <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1322,7 +1322,7 @@ shinyServer(function(input, output, session) {
   })
   
   offenders_table <- reactive({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1341,7 +1341,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$plot <- renderPlot({
-    if (is.na(input$files[1])) {
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
