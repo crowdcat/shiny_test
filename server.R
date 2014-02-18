@@ -15,81 +15,20 @@ options(stringsAsFactors=F)
 #increase max to 150 MB
 options(shiny.maxRequestSize=150*1024^2)
 
-add.times<-function(df){
-  require('stringr')
-  
-  dash.pattern.short='[0-9]{2}[-][0-9]{2}[-][0-9]{2}' # yy/mm/dd verify
-  dash.pattern.long='[0-9]{4}[-][0-9]{2}[-][0-9]{2}' # yyyy/mm/dd verify
-  slash.pattern.short='[0-9]{2}[/][0-9]{2}[/][0-9]{2}' # mm/dd/yy verify
-  slash.pattern.long='(1[0-2]|[1-9])[/]([1-3][0-9]|[1-9])[/][0-9]{2}' # mm/dd/yyyy
-  
-  if(!is.null(df$X_started_at[1])){
-    # mm/dd/yyyy
-    if(str_detect(df$X_started_at[1],slash.pattern.long)){ # WORKS
-      if(str_detect(df$X_started_at[1],'[0-9]{2}:[0-9]{2}:[0-9]{2}')){ # with seconds
-        df$time_start<-as.numeric(strptime(df$X_started_at,"%m/%d/%Y %H:%M:%S",tz='PST'))/60
-        df$time_finish<-as.numeric(strptime(df$X_created_at,"%m/%d/%Y %H:%M:%S",tz='PST'))/60
-      }
-      else{ # w/o seconds
-        df$time_start<-as.numeric(strptime(df$X_started_at,"%m/%d/%Y %H:%M",tz='PST'))/60
-        df$time_finish<-as.numeric(strptime(df$X_created_at,"%m/%d/%Y %H:%M",tz='PST'))/60
-      }
-    }
-    else{ # WORKS
-      if(str_detect(df$X_started_at[1],'[0-9]{2}:[0-9]{2}:[0-9]{2}')){ # with seconds
-        df$time_start<-as.numeric(strptime(df$X_started_at,"%m/%d/%y %H:%M:%S",tz='PST'))/60
-        df$time_finish<-as.numeric(strptime(df$X_created_at,"%m/%d/%y %H:%M:%S",tz='PST'))/60
-      }
-      else{ # w/o seconds
-        df$time_start<-as.numeric(strptime(df$X_started_at,"%m/%d/%y %H:%M",tz='PST'))/60
-        df$time_finish<-as.numeric(strptime(df$X_created_at,"%m/%d/%y %H:%M",tz='PST'))/60
-      }
-    }
-  }
-  else{ # $started_at cases
-    df$time_start<-as.numeric(strptime(df$started_at,"%m/%d/%y %H:%M",tz='PST'))/60
-    df$time_finish<-as.numeric(strptime(df$created_at,"%m/%d/%y %H:%M",tz='PST'))/60
-  }
-  
-  # rescaling/duration computations
-  start.time<-min(min(df$time_finish),min(df$time_start)) # first time stamp in the job
-  df$time_start<-df$time_start-start.time
-  df$time_finish<-df$time_finish-start.time
-  df$time_duration<-df$time_finish-df$time_start
-  if(min(df$time_duration)<=0){ print("There are anomalous timestamps, coercing durations to 0.")}
-  df$time_duration<-ifelse(df$time_duration>0,df$time_duration,0)
-  df$time_duration_log<-log10(df$time_duration)
-  
-  return(df)
-}
-
-which_bucket <- function(y, fiver) {
-  if (is.na(y)) {
-    return("Trust NA")
-  }
-  if (length(fiver) <= 2) {
-    return(paste("All trust scores between", min(fiver), "and", max(fiver)))
-  }
-  for (i in 1:(length(fiver)-1)) {
-    if ((y >= fiver[i]) & (y < fiver[i+1])) {
-      return(paste("Trust ",fiver[i], " to ", fiver[i+1], sep=""))
-    }
-  }
-  return(paste("Trust ", fiver[(length(fiver)-1)], " to ", fiver[length(fiver)], sep=""))
-}
-
+source('add.times.R')
+source('trust_buckets.R')
 
 
 
 shinyServer(function(input, output, session) {
-   ### Render Image
+  ### Render Image
   output$futurama <- renderText ({
     image_path = "http://cf-public-view.s3.amazonaws.com/coolstuff/fry_not_sure_if.png"
     html_image = paste("<img src=", image_path, " width=\"75%\"/>", sep="")
     paste(html_image)
     
-   })
-
+  })
+  
   ### read in file 
   full_file_raw <- reactive({
     if (is.na(input$files[1])) {
@@ -98,59 +37,156 @@ shinyServer(function(input, output, session) {
     } else {
       inFile <- input$files
       full_file = read.csv(inFile$datapath, na.strings="NaN", stringsAsFactors=FALSE)
-      if (!("X_tainted" %in% names(full_file))) {
-        full_file$X_tainted = "false"
-      }
-      if (!("X_golden" %in% names(full_file))) {
-        full_file$X_golden = "false"
-      }
       return(full_file)
     }
   })
   
-  
+  # add new columnds to full file like assignment durection and last submission
   full_file <- reactive({
     if (is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
       full_file = full_file_raw()
+      # add a tainted column if it's missing
+      if (!("X_tainted" %in% names(full_file))) {
+        full_file$X_tainted = "false"
+      }
+      # add a _golden column if it's missing
+      if (!("X_golden" %in% names(full_file))) {
+        full_file$X_golden = "false"
+      }
+      # add index to be able to subset data
+      full_file$X_index = 1:nrow(full_file)
+      # new created at for scambot to use
       full_file$X_created_at_scambot = full_file$X_created_at
+      # convert the real _created_at for all other functions
       full_file$X_created_at = as.POSIXct(full_file$X_created_at,
                                           format='%m/%d/%Y %H:%M:%S')
+      # add last_submit and num_judgments as columns
+      full_file = ddply(full_file, .(X_worker_id), mutate,
+                        last_submit = X_created_at[length(X_created_at)],
+                        num_judgments = length(X_worker_id))
+      
+      full_file = add.times(full_file)
       return(full_file)
     }
   })
   
-  ###Parse and Organize Data   
+  # this function subsets full_file by left bar controls (Selector for left panel!)
+  subsetted_file <- reactive({
+    if (is.na(input$files[1])) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {    
+      full_by_worker = full_file()
+      
+      print("DF from subsetted_file")
+      print(head(full_by_worker))
+      
+      if (input$country_chosen != "all_countries") {
+        print("Subsetting by country")
+        full_by_worker = full_by_worker[full_by_worker$X_country == input$country_chosen,]
+        
+      }
+      
+      if (input$channel_chosen != "all_channels") {
+        print("Subsetting by channel")
+        full_by_worker = full_by_worker[full_by_worker$X_channel == input$channel_chosen,]
+      }
+      
+      if(input$time_chosen != "none"){
+        print("Subsetting by time")
+        current_time = as.POSIXlt(Sys.time(), "GMT")
+        print(current_time)
+        if(input$time_chosen == "thirty_mins"){
+          #subtracting 30 mins from current time
+          time = current_time - 1800
+          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
+          
+        }
+        else if (input$time_chosen == "last_hr"){
+          time = current_time - 3600
+          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
+        }
+        else if (input$time_chosen == "six_hrs"){
+          time = current_time - 21600
+          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
+        }
+        else if (input$time_chosen == "twelve_hrs"){
+          time = current_time - 43200
+          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
+        }
+        
+        else if (input$time_chosen == "last_day"){
+          time = current_time - 86400
+          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
+        }
+        else if (input$time_chosen == "last_week"){
+          time = current_time - 604800
+          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
+        }
+      }
+      
+      if (!is.null(input$num_judgs)) {
+        print("Subsetting by judgments")
+        full_by_worker = full_by_worker[full_by_worker$num_judgments <= max(input$num_judgs) &
+                                          full_by_worker$num_judgments >= min(input$num_judgs),]
+        
+      }
+      
+      if (!is.null(input$trust_chosen)) {
+        print("Subsetting by trust")
+        full_by_worker = full_by_worker[full_by_worker$X_trust <= max(input$trust_chosen) &
+                                          full_by_worker$X_trust >= min(input$trust_chosen),]
+      }
+      full_by_worker
+    }
+  })
+  
+  ##Get Job ID from name of input file
+  job_id <- reactive({
+    if (is.na(input$files[1])) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      inFile <- input$files$name
+      job_id = gsub(inFile, pattern="^f", replacement="")
+      job_id = str_extract(job_id, "\\d{6}")
+      #job_id = gsub(job_id, pattern="\\.csv", replacement="")
+      return(job_id)
+    }
+  })
+  
+  ### this function gets a single row for every worker to display in contributor table by id
   agg_by_worker <- reactive({
     if (is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      full_file = full_file()
+      full_file = subsetted_file()
       print("Before ddply in agg_by_worker")
-      full_by_worker = ddply(full_file, .(X_worker_id), summarize,
-                             channel = X_channel[1],
-                             country = X_country[1],
-                             ip = paste(unique(X_ip), collapse="<br>"),
-                             num_ips = length(unique(X_ip)),
-                             trust = X_trust[1],
-                             untrusted = X_tainted[1],
-                             last_submit = X_created_at[length(X_created_at)],
-                             num_judgments = length(X_worker_id))
+      agg_by_worker = ddply(full_file, .(X_worker_id), summarize,
+                            channel = X_channel[1],
+                            country = X_country[1],
+                            ip = paste(unique(X_ip), collapse="<br>"),
+                            num_ips = length(unique(X_ip)),
+                            trust = X_trust[1],
+                            untrusted = X_tainted[1],
+                            last_submit = last_submit[1],
+                            num_judgments = num_judgments[1])
       print("After ddply in agg_by_worker")
-      print(names(full_by_worker))
-      full_by_worker
+      print(names(agg_by_worker))
+      agg_by_worker
     }
   })
   
+  # matches the functionality of agg_by_worker; note that the actual subsetting is done later
   agg_by_ip <- reactive({
     if (is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      inFile <- input$files
       full_file_ip = full_file()
       full_by_ip = ddply(full_file_ip[], .(X_ip), summarize,
                          channel_ip = X_channel[1],
@@ -169,6 +205,7 @@ shinyServer(function(input, output, session) {
     
   })
   
+  # obtains the slice of the data frame that refers to a particular id
   full_file_contrib_id <- reactive({
     if (is.na(input$files[1]) || input$id_chosen_profiles=="") {
       # User has not uploaded a file yet
@@ -177,25 +214,12 @@ shinyServer(function(input, output, session) {
       full_file_contrib_id = full_file()
       id = input$id_chosen_profiles
       full_file_contrib_id = full_file_contrib_id[full_file_contrib_id$X_worker_id == id,]
-      
       full_file_contrib_id
     }
     
   })
   
-  ##Get Job ID from name of input file
-  job_id <- reactive({
-    if (is.na(input$files[1])) {
-      # User has not uploaded a file yet
-      return(NULL)
-    } else {
-      inFile <- input$files$name
-      job_id = gsub(inFile, pattern="^f", replacement="")
-      job_id = str_extract(job_id, "\\d{6}")
-      #job_id = gsub(job_id, pattern="\\.csv", replacement="")
-      return(job_id)
-    }
-  })
+  
   
   ###Used to record golds and units worked on, as well as contributor location info
   distros <-reactive({
@@ -211,9 +235,6 @@ shinyServer(function(input, output, session) {
                               num_golds = length(X_unit_id[X_golden == "true"]),
                               num_non_golds = length(X_unit_id[X_golden != "true"])
       )
-      
-      
-      
       full_by_distros    
       
     }
@@ -234,7 +255,7 @@ shinyServer(function(input, output, session) {
     
   })
   
-  ####UI Outputs #### 
+  #### Selector for left panel! #### 
   ##SIDEBAR PANEL###
   output$trustSelector <- renderUI({
     print(input$files)
@@ -242,8 +263,8 @@ shinyServer(function(input, output, session) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      workers = agg_by_worker()
-      trust_levels = range(workers$trust)
+      workers = full_file()
+      trust_levels = range(workers$X_trust)
       sliderInput(inputId = "trust_chosen",
                   label = "Overall Trust",
                   min = trust_levels[1] - .001, max = trust_levels[2] + .001,
@@ -256,8 +277,8 @@ shinyServer(function(input, output, session) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      workers = agg_by_worker()
-      country_list = unique(workers$country)
+      workers = full_file()
+      country_list = unique(workers$X_country)
       alpha_countries = sort(country_list)
       countries <- c("all_countries", alpha_countries)
       selectInput(inputId="country_chosen", label="Subset by Country:", countries)
@@ -270,8 +291,8 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       
-      workers = agg_by_worker()
-      workers_list = unique(workers$channel)
+      workers = full_file()
+      workers_list = unique(workers$X_channel)
       alpha_workers = sort(workers_list)
       channels <- c("all_channels", alpha_workers)
       selectInput(inputId="channel_chosen", label="Subset by Channel:", channels)
@@ -304,7 +325,7 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       
-      workers = agg_by_worker()
+      workers = subsetted_file()
       workers_ip = agg_by_ip()
       judg_levels = c()
       print("IP min")
@@ -338,7 +359,7 @@ shinyServer(function(input, output, session) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      full_file_with_times = full_file_scambot()
+      full_file_with_times = full_file()
       print("In scambot selector about to print a column")
       print(head(full_file_with_times$time_duration_log))
       print("Printing min time")
@@ -351,6 +372,8 @@ shinyServer(function(input, output, session) {
                   min = min_time, max = max_time, value = min_time, step= 0.1)
     }
   })
+  
+  #### END OF Selector for left panel! #### 
   
   ###Contributor ID Table  
   
@@ -818,6 +841,10 @@ shinyServer(function(input, output, session) {
     }
   })
   
+  ## subset by country, channel, and last judgment for everyone not just worker table
+  
+  
+  
   #### Contributor Table Reacts to Functions Inputs is loaded in create_html_table #### 
   live_worker_table <- reactive({
     if (is.na(input$files[1])) {
@@ -826,62 +853,6 @@ shinyServer(function(input, output, session) {
     } else {    
       
       full_by_worker = agg_by_worker()
-      
-      if (input$country_chosen != "all_countries") {
-        print("Subsetting by country")
-        full_by_worker = full_by_worker[full_by_worker$country == input$country_chosen,]
-        
-      }
-      
-      if (input$channel_chosen != "all_channels") {
-        print("Subsetting by channel")
-        full_by_worker = full_by_worker[full_by_worker$channel == input$channel_chosen,]
-      }
-      
-      if(input$time_chosen != "none"){
-        current_time = as.POSIXlt(Sys.time(), "GMT")
-        print(current_time)
-        if(input$time_chosen == "thirty_mins"){
-          #subtracting 30 mins from current time
-          time = current_time - 1800
-          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
-          
-        }
-        else if (input$time_chosen == "last_hr"){
-          time = current_time - 3600
-          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
-        }
-        else if (input$time_chosen == "six_hrs"){
-          time = current_time - 21600
-          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
-        }
-        else if (input$time_chosen == "twelve_hrs"){
-          time = current_time - 43200
-          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
-        }
-        
-        else if (input$time_chosen == "last_day"){
-          time = current_time - 86400
-          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
-        }
-        else if (input$time_chosen == "last_week"){
-          time = current_time - 604800
-          full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
-        }
-      }
-      
-      if (!is.null(input$num_judgs)) {
-        print("Subsetting by judgments")
-        full_by_worker = full_by_worker[full_by_worker$num_judgments <= max(input$num_judgs) &
-                                          full_by_worker$num_judgments >= min(input$num_judgs),]
-        
-      }
-      
-      if (!is.null(input$trust_chosen)) {
-        print("Subsetting by trust")
-        full_by_worker = full_by_worker[full_by_worker$trust <= max(input$trust_chosen) &
-                                          full_by_worker$trust >= min(input$trust_chosen),]
-      }
       
       if(input$id_chosen != ""){
         print("Searching by ID")
@@ -1325,122 +1296,155 @@ shinyServer(function(input, output, session) {
   })
   
   ###SCAMBOT AND BURNINATOR
-  full_file_scambot <- reactive({
+  
+  
+  ################################ here comes scambot ##########################################
+  
+  constrained_scambot <- reactive({
     if (is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      full_file = full_file()
-      full_file$X_created_at = full_file$X_created_at_scambot
-      full_file = add.times(full_file)
-      return(full_file)
+      subsetted_file = subsetted_file()
+      df = full_file()
+      constrained = df$X_index %in% subsetted_file$X_index
+      df = df[constrained,]
+      print("Got file for scambot")
+      df$size_vec = rep(1, times=nrow(df))
+      print("Got quantiles and size_vec")
+      
+      df = df[,c("time_start","time_duration_log","X_trust","size_vec", "X_channel", "X_country")]
+      
+      df
     }
   })
   
-  ################################ here comes scambot ##########################################
-  output$plot = renderPlot({
-    df=full_file_scambot()
-    print("Got file for scambot")
-    qnt=quantile(df$time_duration_log,probs=c(0.5,0.10,0.05))
-    df$size_vec = rep(1, times=nrow(df))
-    print("Got quantiles and size_vec")
-    
-    p = ggplot(df, aes_string(x="time_start", y="time_duration_log",color="X_trust"))+
-      geom_point(aes(size="size_vec")) +
-      scale_size_manual(values=c(2,10))+
-      theme(legend.position="bottom")+
-      guides(col = guide_legend(ncol = 20)) +
-      geom_hline(yintercept=qnt[1],linetype='solid',alpha=0.5)+
-      geom_hline(yintercept=qnt[2],linetype='dashed',alpha=0.5)+
-      geom_hline(yintercept=qnt[3],linetype='dotted')+
-      annotate("text", x=0, qnt[1], label="Mean")+
-      annotate("text", x=0, qnt[2], label="10%")+
-      annotate("text", x=0, qnt[3], label="5%")+
-      geom_hline(yintercept=input$threshold,color="red")
-    print("first part of the plot done")
-    under_line=df[df$time_duration_log<input$threshold, ]
-    print("Subsetting by threshold, about to get offenders")
-    offenders = df[df$X_worker_id %in% under_line$X_worker_id,]
-    print(dim(offenders))
-    print(head(offenders))
-    print("Adding points to the plot")
-    if (nrow(offenders) > 0) {
-      p = p + geom_point(data = offenders, colour = "red")
+  premade_scambot_plot <- reactive({
+    if (is.na(input$files[1])) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      df = full_file()
+      qnt=quantile(df$time_duration_log,probs=c(0.5,0.10,0.05))
+      p = ggplot(df, aes_string(x="time_start", y="time_duration_log", color="X_trust")) +
+        geom_point(color="gainsboro") +
+        scale_size_manual(values=c(2,10)) +
+        theme(legend.position="bottom")+
+        guides(col = guide_legend(ncol = 20))+
+        geom_hline(yintercept=qnt[1],linetype='solid',alpha=0.5)+
+        geom_hline(yintercept=qnt[2],linetype='dashed',alpha=0.5)+
+        geom_hline(yintercept=qnt[3],linetype='dotted')+
+        annotate("text", x=0, qnt[1], label="Mean")+
+        annotate("text", x=0, qnt[2], label="10%")+
+        annotate("text", x=0, qnt[3], label="5%")
+      p
     }
-    print(p)
-    
+  })
+  
+  offenders_table <- reactive({
+    if (is.na(input$files[1])) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      df=subsetted_file()
+      print("not broken")
+      threshold = input$threshold
+      print("Defined threshold, about to subset in Burminator")
+      df_under=df[which(df$time_duration_log<threshold),c("X_worker_id","X_ip", "time_duration")]
+      if (nrow(df_under)==0) {
+        return(df_under)
+      }
+      df = df[df$X_worker_id %in% df_under$X_worker_id,]
+      df$is_under_line = df$time_duration_log < threshold
+      df
+    }
+  })
+  
+  output$plot <- renderPlot({
+    if (is.na(input$files[1])) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      new_df = subsetted_file()
+      p = premade_scambot_plot()
+      # add new data
+      if (nrow(new_df) >0) {
+        p = p + geom_point(data=new_df,aes_string(color="X_trust"))
+      }
+      # add the red line
+      if (!is.null(input$threshold) || !is.na(input$threshold)) {
+        p = p + geom_hline(yintercept=input$threshold,color="red")
+      }
+      # add offenders
+      offenders = offenders_table()
+      if (nrow(offenders) > 0) {
+        p = p + geom_point(data = offenders, colour = "red")
+      }  
+      print(p)
+    }
   },height=1000)
   
   output$offenders <- renderText({
-    df=full_file_scambot()
-    print("not broken")
-    threshold = input$threshold
-    print("Defined threshold, about to subset in Burminator")
-    df_under=df[which(df$time_duration_log<threshold),c("X_worker_id","X_ip", "time_duration")]
-    if (nrow(df_under)==0) {
-      return(NULL)
-    }
-    print("Subsetted judgments, about to subset workers in Burminator")
-    df = df[df$X_worker_id %in% df_under$X_worker_id,]
-    df$is_under_line = df$time_duration_log < threshold
-    print(table(df$is_under_line))
-    #print(df$time_duration)
-    print(typeof(df$X_worker_id))
-    print("probs about to break")
-    thou_dost_offend_me = ddply(df, .(X_worker_id), summarize,
-                                ip = X_ip[1],
-                                location = paste(X_city[1], X_country[1], sep=", "),
-                                channel = X_channel[1],
-                                min_assignment_time = min(time_duration),
-                                max_assignment_time = max(time_duration),
-                                num_judgments = length(time_duration),
-                                num_offenses = sum(is_under_line==TRUE))
-    thou_dost_offend_me$min_assignment_time = round(thou_dost_offend_me$min_assignment_time,2)
-    thou_dost_offend_me$max_assignment_time = round(thou_dost_offend_me$max_assignment_time,2)
-    
-    job_id = job_id()
-    html_offenders = "<table border=1>"
-    #worker_table$last_submit = as.character(worker_table$last_submit)
-    thou_dost_offend_me = rbind(names(thou_dost_offend_me),
-                                thou_dost_offend_me)
-    for (i in 1:nrow(thou_dost_offend_me)) {
-      this_row = thou_dost_offend_me[i,]
-      html_offenders = paste(html_offenders, '<tr>', sep="\n")
-      if (i == 1) {
-        for (value in this_row) {
-          html_offenders = paste(html_offenders, '<td>', sep="\n")
-          html_offenders = paste(html_offenders,
-                                 paste("<b>",value, "</b>"),
-                                 sep="\n") # pastes value!
-          html_offenders = paste(html_offenders, '</td>', sep="\n")
-        }
-      } else {
-        for (value_id in 1:length(this_row)) {
-          value = this_row[value_id]
-          html_offenders = paste(html_offenders, '<td>', sep="\n")
-          if (value_id == 1) {
-            value_link = paste("https://crowdflower.com/jobs/",
-                               job_id,
-                               "/contributors/",
-                               value,
-                               sep=""
-            )
-            value_to_paste= paste("<a href=\"",
-                                  value_link,
-                                  "\" target=\"_blank\">",
-                                  value,
-                                  "</a>")
-            html_offenders = paste(html_offenders, value_to_paste, sep="\n") # pastes value!
-          } else {
-            html_offenders = paste(html_offenders, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
+    df=offenders_table()
+    if (nrow(df) > 0) {
+      print("probs about to break")
+      thou_dost_offend_me = ddply(df, .(X_worker_id), summarize,
+                                  ip = X_ip[1],
+                                  location = paste(X_city[1], X_country[1], sep=", "),
+                                  channel = X_channel[1],
+                                  min_assignment_time = min(time_duration),
+                                  max_assignment_time = max(time_duration),
+                                  num_judgments = length(time_duration),
+                                  num_offenses = sum(is_under_line==TRUE))
+      thou_dost_offend_me$min_assignment_time = round(thou_dost_offend_me$min_assignment_time,2)
+      thou_dost_offend_me$max_assignment_time = round(thou_dost_offend_me$max_assignment_time,2)
+      
+      job_id = job_id()
+      html_offenders = "<table border=1>"
+      #worker_table$last_submit = as.character(worker_table$last_submit)
+      thou_dost_offend_me = rbind(names(thou_dost_offend_me),
+                                  thou_dost_offend_me)
+      for (i in 1:nrow(thou_dost_offend_me)) {
+        this_row = thou_dost_offend_me[i,]
+        html_offenders = paste(html_offenders, '<tr>', sep="\n")
+        if (i == 1) {
+          for (value in this_row) {
+            html_offenders = paste(html_offenders, '<td>', sep="\n")
+            html_offenders = paste(html_offenders,
+                                   paste("<b>",value, "</b>"),
+                                   sep="\n") # pastes value!
+            html_offenders = paste(html_offenders, '</td>', sep="\n")
           }
-          html_offenders = paste(html_offenders, '</td>', sep="\n")
+        } else {
+          for (value_id in 1:length(this_row)) {
+            value = this_row[value_id]
+            html_offenders = paste(html_offenders, '<td>', sep="\n")
+            if (value_id == 1) {
+              value_link = paste("https://crowdflower.com/jobs/",
+                                 job_id,
+                                 "/contributors/",
+                                 value,
+                                 sep=""
+              )
+              value_to_paste= paste("<a href=\"",
+                                    value_link,
+                                    "\" target=\"_blank\">",
+                                    value,
+                                    "</a>")
+              html_offenders = paste(html_offenders, value_to_paste, sep="\n") # pastes value!
+            } else {
+              html_offenders = paste(html_offenders, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
+            }
+            html_offenders = paste(html_offenders, '</td>', sep="\n")
+          }
         }
+        html_offenders = paste(html_offenders, '</tr>', sep="\n")
       }
-      html_offenders = paste(html_offenders, '</tr>', sep="\n")
+      html_offenders = paste(html_offenders,"</table>", sep="\n")
+      paste(html_offenders)
+    } else {
+      paste("<b>Looks like nobody fell under the red line!</b>")
     }
-    html_offenders = paste(html_offenders,"</table>", sep="\n")
-    paste(html_offenders)
   })
   
   output$downloadData <- downloadHandler(
