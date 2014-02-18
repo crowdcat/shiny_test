@@ -1349,7 +1349,9 @@ shinyServer(function(input, output, session) {
       p = premade_scambot_plot()
       # add new data
       if (nrow(new_df) >0) {
-        p = p + geom_point(data=new_df,aes_string(color="X_trust"))
+        new_df$X_trust <- cut(new_df$X_trust,10)
+        p = p + geom_point(data=new_df,aes_string(color="X_trust")) +
+          scale_colour_brewer(palette="PuOr")
       }
       # add the red line
       if (!is.null(input$threshold) || !is.na(input$threshold)) {
