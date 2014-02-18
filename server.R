@@ -242,12 +242,13 @@ shinyServer(function(input, output, session) {
   })
   
   ### To Collect Gold Cols and Answers
+  # grabs names of gold columns, removes "_gold" and returns question names
   full_file_gold_answers <- reactive({
     if (is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      full_file = full_file()
+      full_file = subsetted_file()
       gold_cols = grepl(".\\gold$", names(full_file)) & !grepl(".\\golden",names(full_file))
       gold_cols_names = names(full_file)[gold_cols]    
       gold_cols_names
@@ -1098,7 +1099,7 @@ shinyServer(function(input, output, session) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      full_file = full_file()
+      full_file = subsetted_file()
       answer_cols = grepl(pattern=".\\gold$", names(full_file)) &
         !grepl(pattern=".\\golden",names(full_file))
       answer_cols_names = names(full_file)[answer_cols]
