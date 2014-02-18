@@ -364,7 +364,7 @@ shinyServer(function(input, output, session) {
       print("In scambot selector about to print a column")
       print(head(full_file_with_times$time_duration_log))
       print("Printing min time")
-      min_time = min(full_file_with_times$time_duration_log,na.rm=T)
+      min_time = min(full_file_with_times$time_duration_log,na.rm=T) - 0.1
       print(min_time)
       print("Printing max time")
       max_time = max(full_file_with_times$time_duration_log,na.rm=T)
