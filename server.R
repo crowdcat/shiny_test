@@ -349,8 +349,8 @@ shinyServer(function(input, output, session) {
       print(judg_levels)
       sliderInput(inputId = "num_judgs",
                   label = "Number of Judgments",
-                  min = judg_levels[1] - 10, max = judg_levels[2] + 10, 
-                  step = 10, value = c(judg_levels[1] - 10, judg_levels[2] + 10)) 
+                  min = judg_levels[1] - 1, max = judg_levels[2] + 1, 
+                  step = 10, value = c(judg_levels[1] - 1, judg_levels[2] + 1)) 
     }
   })
   
