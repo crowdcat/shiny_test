@@ -1297,28 +1297,7 @@ shinyServer(function(input, output, session) {
   })
   
   ###SCAMBOT AND BURNINATOR
-  
-  
   ################################ here comes scambot ##########################################
-  
-  constrained_scambot <- reactive({
-    if (is.na(input$files[1])) {
-      # User has not uploaded a file yet
-      return(NULL)
-    } else {
-      subsetted_file = subsetted_file()
-      df = full_file()
-      constrained = df$X_index %in% subsetted_file$X_index
-      df = df[constrained,]
-      print("Got file for scambot")
-      df$size_vec = rep(1, times=nrow(df))
-      print("Got quantiles and size_vec")
-      
-      df = df[,c("time_start","time_duration_log","X_trust","size_vec", "X_channel", "X_country")]
-      
-      df
-    }
-  })
   
   premade_scambot_plot <- reactive({
     if (is.na(input$files[1])) {
