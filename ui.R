@@ -1,5 +1,11 @@
+<<<<<<< HEAD
 ###contributors
 ### Last updated 02/13/2014
+=======
+###contributor_profile_tab
+### Last updated 02/11/2014
+# random comment for github 
+>>>>>>> 1ef49ae8a944ab391c41acbacb5ffeabf64f0664
 
 require('shiny')
 require('rCharts')
@@ -27,6 +33,7 @@ shinyUI(pageWithSidebar(
     ),
     uiOutput("scambotSelector"),
     htmlOutput("summary_message"),
+    htmlOutput("futurama"),
     tags$style(type="text/css", ".tab-content { overflow: visible; }", "svg { height: 150%; }")
   ),
   mainPanel(
