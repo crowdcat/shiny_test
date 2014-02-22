@@ -10,6 +10,7 @@ require('plyr')
 require('rCharts')
 require('ggplot2')
 require('devtools')
+#end of library dependencies
 
 options(stringsAsFactors=F)
 #increase max to 150 MB
