@@ -32,9 +32,36 @@ shinyServer(function(input, output, session) {
 
   ### read in file    
   full_file <- reactive({
-    if (is.na(input$files[1])) {
-
+    if (is.null(input$files[1]) || is.na(input$files[1])) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      full_file = full_file_raw()
+      # add a tainted column if it's missing
+      if (!("X_tainted" %in% names(full_file))) {
+        full_file$X_tainted = "false"
+      }
+      # add a _golden column if it's missing
+      if (!("X_golden" %in% names(full_file))) {
+        full_file$X_golden = "false"
+      }
+      # add index to be able to subset data
+      full_file$X_index = 1:nrow(full_file)
+      # new created at for scambot to use
+      full_file$X_created_at_scambot = full_file$X_created_at
+      # convert the real _created_at for all other functions
+      full_file$X_created_at = as.POSIXct(full_file$X_created_at,
+                                          format='%m/%d/%Y %H:%M:%S')
+      # add last_submit and num_judgments as columns
+      full_file = ddply(full_file, .(X_worker_id), mutate,
+                        last_submit = X_created_at[length(X_created_at)],
+                        num_judgments = length(X_worker_id))
+      
+      full_file = add.times(full_file)
+      return(full_file)
+    }
   })
+  
   
   ### read in file 
   full_file_raw <- reactive({
@@ -1640,8 +1667,6 @@ output$create_similar_table <- renderText({
       
       #save to user's machine
       write.csv(dworkers, paste(file,sep=''), row.names=F)
-    }
-  )  
-  
-  
+    })  
+    
 })
