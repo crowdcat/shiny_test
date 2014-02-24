@@ -10,6 +10,7 @@ require('plyr')
 require('rCharts')
 require('ggplot2')
 require('devtools')
+#end of library dependencies
 
 options(stringsAsFactors=F)
 #increase max to 150 MB
@@ -21,17 +22,29 @@ source('trust_buckets.R')
 
 
 shinyServer(function(input, output, session) {
+<<<<<<< HEAD
+   ### Render Image
+=======
   ### Render Image
+>>>>>>> 1ef49ae8a944ab391c41acbacb5ffeabf64f0664
   output$futurama <- renderText ({
     image_path = "http://cf-public-view.s3.amazonaws.com/coolstuff/fry_not_sure_if.png"
     html_image = paste("<img src=", image_path, " width=\"75%\"/>", sep="")
     paste(html_image)
     
+<<<<<<< HEAD
+   })
+
+  ### read in file    
+  full_file <- reactive({
+    if (is.na(input$files[1])) {
+=======
   })
   
   ### read in file 
   full_file_raw <- reactive({
     if (is.null(input$files[1]) || is.na(input$files[1])) {
+>>>>>>> 1ef49ae8a944ab391c41acbacb5ffeabf64f0664
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -219,7 +232,23 @@ shinyServer(function(input, output, session) {
     
   })
   
+<<<<<<< HEAD
+  ##Get Job ID from name of input file
+  job_id <- reactive({
+    if (is.na(input$files[1])) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      inFile <- input$files$name
+      job_id = gsub(inFile, pattern="^f", replacement="")
+      job_id = str_extract(job_id, "\\d{6}")
+      #job_id = gsub(job_id, pattern="\\.csv", replacement="")
+      return(job_id)
+    }
+  })
+=======
   
+>>>>>>> 1ef49ae8a944ab391c41acbacb5ffeabf64f0664
   
   ###Used to record golds and units worked on, as well as contributor location info
   distros <-reactive({
@@ -1367,6 +1396,66 @@ shinyServer(function(input, output, session) {
   },height=1000)
   
   output$offenders <- renderText({
+<<<<<<< HEAD
+    df=full_file_scambot()
+    print("not broken")
+    threshold = input$threshold
+    print("Defined threshold, about to subset in Burminator")
+    df_under=df[which(df$time_duration_log<threshold),c("X_worker_id","X_ip", "time_duration")]
+    print("Subsetted judgments, about to subset workers in Burminator")
+    df = df[df$X_worker_id %in% df_under$X_worker_id,]
+    df$is_under_line = df$time_duration_log < threshold
+    print(table(df$is_under_line))
+    #print(df$time_duration)
+    print(typeof(df$X_worker_id))
+    print("probs about to break")
+    thou_dost_offend_me = ddply(df, .(X_worker_id), summarize,
+                                ip = X_ip[1],
+                                location = paste(X_city[1], X_country[1], sep=", "),
+                                channel = X_channel[1],
+                                min_assignment_time = min(time_duration),
+                                max_assignment_time = max(time_duration),
+                                num_judgments = length(time_duration),
+                                num_offenses = sum(is_under_line==TRUE))
+    thou_dost_offend_me$min_assignment_time = round(thou_dost_offend_me$min_assignment_time,2)
+    thou_dost_offend_me$max_assignment_time = round(thou_dost_offend_me$max_assignment_time,2)
+    
+    job_id = job_id()
+    html_offenders = "<table border=1>"
+    #worker_table$last_submit = as.character(worker_table$last_submit)
+    thou_dost_offend_me = rbind(names(thou_dost_offend_me),
+                                thou_dost_offend_me)
+    for (i in 1:nrow(thou_dost_offend_me)) {
+      this_row = thou_dost_offend_me[i,]
+      html_offenders = paste(html_offenders, '<tr>', sep="\n")
+      if (i == 1) {
+        for (value in this_row) {
+          html_offenders = paste(html_offenders, '<td>', sep="\n")
+          html_offenders = paste(html_offenders,
+                                 paste("<b>",value, "</b>"),
+                                 sep="\n") # pastes value!
+          html_offenders = paste(html_offenders, '</td>', sep="\n")
+        }
+      } else {
+        for (value_id in 1:length(this_row)) {
+          value = this_row[value_id]
+          html_offenders = paste(html_offenders, '<td>', sep="\n")
+          if (value_id == 1) {
+            value_link = paste("https://crowdflower.com/jobs/",
+                               job_id,
+                               "/contributors/",
+                               value,
+                               sep=""
+            )
+            value_to_paste= paste("<a href=\"",
+                                  value_link,
+                                  "\" target=\"_blank\">",
+                                  value,
+                                  "</a>")
+            html_offenders = paste(html_offenders, value_to_paste, sep="\n") # pastes value!
+          } else {
+            html_offenders = paste(html_offenders, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
+=======
     df=offenders_table()
     if (nrow(df) > 0) {
       print("probs about to break")
@@ -1418,6 +1507,7 @@ shinyServer(function(input, output, session) {
               html_offenders = paste(html_offenders, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
             }
             html_offenders = paste(html_offenders, '</td>', sep="\n")
+>>>>>>> 1ef49ae8a944ab391c41acbacb5ffeabf64f0664
           }
         }
         html_offenders = paste(html_offenders, '</tr>', sep="\n")
