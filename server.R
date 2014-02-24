@@ -1430,11 +1430,32 @@ shinyServer(function(input, output, session) {
   })
   
   output$downloadData <- downloadHandler(
-    filename = function() { paste('offenders.csv', sep='') },
+    filename = function() { paste('scambot_',job_id(),'.csv', sep='') },
     content = function(file) {
-      df=full_file_scambot()
-      df=df[which(df$time_duration_log<input$threshold),c("X_worker_id","X_ip")]
-      write.csv(df, file)
+      dworkers=offenders_table()
+      df=df[,c("X_worker_id","X_ip")]
+      tpercent = mean( df$time_duration >= input$threshold)
+      cat("\n#############\n",file=stderr())
+      for(i in 1:nrow(dworkers)){
+        cat(dworkers[1,1],file=stderr())
+      }
+      cat("\n#############\n",file=stderr())
+      
+      # flag workers
+      flag_user = function(x) {
+        flag_head=paste("curl -X PUT \'https://crowdflower.com/jobs/", input$inFile,"/contributors/",sep='')
+        flag_tail="/reject?key=b0ddc5a1840a88c5c57be01fef888970ce9bbe08&reason=scambot_speed_violation_punch_these_guys_in_the_face\' -d \'\'"
+        system(paste(flag_head,x,flag_tail,sep=''))
+      }
+      cat("\n#############\n",file=stderr())
+      for(i in 1:nrow(dworkers)){
+        cat(dworkers[1,1],file=stderr())
+      }
+      cat("\n#############\n",file=stderr())
+      lapply(dworkers[,1],flag_user)
+      
+      #save to user's machine
+      write.csv(dworkers, paste(file,sep=''), row.names=F)
     }
   )  
   
