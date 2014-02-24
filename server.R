@@ -22,29 +22,25 @@ source('trust_buckets.R')
 
 
 shinyServer(function(input, output, session) {
-<<<<<<< HEAD
-   ### Render Image
-=======
+
   ### Render Image
->>>>>>> 1ef49ae8a944ab391c41acbacb5ffeabf64f0664
   output$futurama <- renderText ({
     image_path = "http://cf-public-view.s3.amazonaws.com/coolstuff/fry_not_sure_if.png"
     html_image = paste("<img src=", image_path, " width=\"75%\"/>", sep="")
     paste(html_image)
-    
-<<<<<<< HEAD
+
    })
 
   ### read in file    
   full_file <- reactive({
     if (is.na(input$files[1])) {
-=======
+
   })
   
   ### read in file 
   full_file_raw <- reactive({
     if (is.null(input$files[1]) || is.na(input$files[1])) {
->>>>>>> 1ef49ae8a944ab391c41acbacb5ffeabf64f0664
+
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -232,7 +228,6 @@ shinyServer(function(input, output, session) {
     
   })
   
-<<<<<<< HEAD
   ##Get Job ID from name of input file
   job_id <- reactive({
     if (is.na(input$files[1])) {
@@ -246,9 +241,7 @@ shinyServer(function(input, output, session) {
       return(job_id)
     }
   })
-=======
-  
->>>>>>> 1ef49ae8a944ab391c41acbacb5ffeabf64f0664
+
   
   ###Used to record golds and units worked on, as well as contributor location info
   distros <-reactive({
@@ -1396,7 +1389,7 @@ shinyServer(function(input, output, session) {
   },height=1000)
   
   output$offenders <- renderText({
-<<<<<<< HEAD
+
     df=full_file_scambot()
     print("not broken")
     threshold = input$threshold
@@ -1455,7 +1448,7 @@ shinyServer(function(input, output, session) {
             html_offenders = paste(html_offenders, value_to_paste, sep="\n") # pastes value!
           } else {
             html_offenders = paste(html_offenders, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
-=======
+
     df=offenders_table()
     if (nrow(df) > 0) {
       print("probs about to break")
@@ -1507,7 +1500,7 @@ shinyServer(function(input, output, session) {
               html_offenders = paste(html_offenders, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
             }
             html_offenders = paste(html_offenders, '</td>', sep="\n")
->>>>>>> 1ef49ae8a944ab391c41acbacb5ffeabf64f0664
+
           }
         }
         html_offenders = paste(html_offenders, '</tr>', sep="\n")
