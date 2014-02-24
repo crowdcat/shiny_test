@@ -21,6 +21,10 @@ source('trust_buckets.R')
 
 
 shinyServer(function(input, output, session) {
+<<<<<<< HEAD
+=======
+
+>>>>>>> b06fce4ac8635c5ab036e4d4159465a133f83b5f
   ### Render Image
   output$futurama <- renderText ({
     image_path = "http://cf-public-view.s3.amazonaws.com/coolstuff/fry_not_sure_if.png"
@@ -38,6 +42,10 @@ shinyServer(function(input, output, session) {
   ### read in file 
   full_file_raw <- reactive({
     if (is.null(input$files[1]) || is.na(input$files[1])) {
+<<<<<<< HEAD
+=======
+
+>>>>>>> b06fce4ac8635c5ab036e4d4159465a133f83b5f
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1599,6 +1607,10 @@ output$create_similar_table <- renderText({
               html_offenders = paste(html_offenders, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
             }
             html_offenders = paste(html_offenders, '</td>', sep="\n")
+<<<<<<< HEAD
+=======
+
+>>>>>>> b06fce4ac8635c5ab036e4d4159465a133f83b5f
           }
         }
         html_offenders = paste(html_offenders, '</tr>', sep="\n")
