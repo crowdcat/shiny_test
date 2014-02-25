@@ -11,21 +11,21 @@ add.times<-function(df){
     if(str_detect(df$X_started_at[1],slash.pattern.long)){ # WORKS
       if(str_detect(df$X_started_at[1],'[0-9]{2}:[0-9]{2}:[0-9]{2}')){ # with seconds
         df$time_start<-as.numeric(strptime(df$X_started_at,"%m/%d/%Y %H:%M:%S",tz='PST'))/60
-        df$time_finish<-as.numeric(strptime(df$X_created_at,"%m/%d/%Y %H:%M:%S",tz='PST'))/60
+        df$time_finish<-as.numeric(strptime(df$X_created_at_scambot,"%m/%d/%Y %H:%M:%S",tz='PST'))/60
       }
       else{ # w/o seconds
         df$time_start<-as.numeric(strptime(df$X_started_at,"%m/%d/%Y %H:%M",tz='PST'))/60
-        df$time_finish<-as.numeric(strptime(df$X_created_at,"%m/%d/%Y %H:%M",tz='PST'))/60
+        df$time_finish<-as.numeric(strptime(df$X_created_at_scambot,"%m/%d/%Y %H:%M",tz='PST'))/60
       }
     }
     else{ # WORKS
       if(str_detect(df$X_started_at[1],'[0-9]{2}:[0-9]{2}:[0-9]{2}')){ # with seconds
         df$time_start<-as.numeric(strptime(df$X_started_at,"%m/%d/%y %H:%M:%S",tz='PST'))/60
-        df$time_finish<-as.numeric(strptime(df$X_created_at,"%m/%d/%y %H:%M:%S",tz='PST'))/60
+        df$time_finish<-as.numeric(strptime(df$X_created_at_scambot,"%m/%d/%y %H:%M:%S",tz='PST'))/60
       }
       else{ # w/o seconds
         df$time_start<-as.numeric(strptime(df$X_started_at,"%m/%d/%y %H:%M",tz='PST'))/60
-        df$time_finish<-as.numeric(strptime(df$X_created_at,"%m/%d/%y %H:%M",tz='PST'))/60
+        df$time_finish<-as.numeric(strptime(df$X_created_at_scambot,"%m/%d/%y %H:%M",tz='PST'))/60
       }
     }
   }
