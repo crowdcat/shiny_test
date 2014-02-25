@@ -1,11 +1,6 @@
-
-###contributors
-### Last updated 02/13/2014
-
 ###contributor_profile_tab
 ### Last updated 02/11/2014
 # random comment for github 
-
 
 require('shiny')
 require('rCharts')
@@ -17,10 +12,9 @@ shinyUI(pageWithSidebar(
   
   
   sidebarPanel(
-    htmlOutput("futurama"),
     fileInput("files", h4("Select a full report:"), multiple=FALSE, 
               accept=c('text/csv', 'text/comma-separated-values,text/plain', '.csv')),
-    h4("********"),
+    h4("***"),
     uiOutput("countrySelector"),
     uiOutput("channelSelector"),
     uiOutput("timeSelector"),
@@ -62,29 +56,29 @@ shinyUI(pageWithSidebar(
                br(),
                tabsetPanel(
                  tabPanel("Unit Data",
+                          
+                          h4("Total Number of Units"),
+                          uiOutput("profileUnitCount"),
+                          h4("Units Seen"),
+                          htmlOutput("create_unit_links"),
+                          h4("Answer Distros"),
+                          uiOutput("profileQuestionSelector"),
+                          showOutput("profile_units_distros", "nvd3"),
+                          htmlOutput("unitDistrosExplain"),
+                          br()
+                 ),
+                 tabPanel("Gold Data",
+                          h4("Total Number of Golds"),
+                          uiOutput("profileGoldCount"),
+                          h4("Golds Seen"),
+                          htmlOutput("create_gold_links"),
+                          h4("Gold Distros"),
+                          uiOutput("profileQuestionSelectorGolds"),
+                          showOutput("profile_golds_distros", "nvd3"),
+                          htmlOutput("goldDistrosExplain")),
+                 tabPanel("Similar Workers",
+                          htmlOutput("create_similar_table")))
                
-               h4("Total Number of Units"),
-               uiOutput("profileUnitCount"),
-               h4("Units Seen"),
-               htmlOutput("create_unit_links"),
-               h4("Answer Distros"),
-               uiOutput("profileQuestionSelector"),
-               showOutput("profile_units_distros", "nvd3"),
-               htmlOutput("unitDistrosExplain"),
-               br()
-               ),
-                tabPanel("Gold Data",
-               h4("Total Number of Golds"),
-               uiOutput("profileGoldCount"),
-               h4("Golds Seen"),
-               htmlOutput("create_gold_links"),
-               h4("Gold Distros"),
-               uiOutput("profileQuestionSelectorGolds"),
-               showOutput("profile_golds_distros", "nvd3"),
-               htmlOutput("goldDistrosExplain")),
-                tabPanel("Similar Workers",
-               htmlOutput("create_similar_table")))
-              
       ),
       tabPanel("A-Distros",
                h4("Answer Distros"),
@@ -138,6 +132,3 @@ shinyUI(pageWithSidebar(
     )
   )        
 ))  
-
-
-

@@ -21,52 +21,17 @@ source('trust_buckets.R')
 
 
 shinyServer(function(input, output, session) {
-
   ### Render Image
   output$futurama <- renderText ({
     image_path = "http://cf-public-view.s3.amazonaws.com/coolstuff/fry_not_sure_if.png"
     html_image = paste("<img src=", image_path, " width=\"75%\"/>", sep="")
     paste(html_image)
-
-   })
-
-  ### read in file    
-  full_file <- reactive({
-    if (is.null(input$files[1]) || is.na(input$files[1])) {
-      # User has not uploaded a file yet
-      return(NULL)
-    } else {
-      full_file = full_file_raw()
-      # add a tainted column if it's missing
-      if (!("X_tainted" %in% names(full_file))) {
-        full_file$X_tainted = "false"
-      }
-      # add a _golden column if it's missing
-      if (!("X_golden" %in% names(full_file))) {
-        full_file$X_golden = "false"
-      }
-      # add index to be able to subset data
-      full_file$X_index = 1:nrow(full_file)
-      # new created at for scambot to use
-      full_file$X_created_at_scambot = full_file$X_created_at
-      # convert the real _created_at for all other functions
-      full_file$X_created_at = as.POSIXct(full_file$X_created_at,
-                                          format='%m/%d/%Y %H:%M:%S')
-      # add last_submit and num_judgments as columns
-      full_file = ddply(full_file, .(X_worker_id), mutate,
-                        last_submit = X_created_at[length(X_created_at)],
-                        num_judgments = length(X_worker_id))
-      
-      full_file = add.times(full_file)
-      return(full_file)
-    }
+    
   })
-  
   
   ### read in file 
   full_file_raw <- reactive({
     if (is.null(input$files[1]) || is.na(input$files[1])) {
-
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -104,6 +69,7 @@ shinyServer(function(input, output, session) {
                         num_judgments = length(X_worker_id))
       
       full_file = add.times(full_file)
+      View(full_file)
       return(full_file)
     }
   })
@@ -254,20 +220,7 @@ shinyServer(function(input, output, session) {
     
   })
   
-  ##Get Job ID from name of input file
-  job_id <- reactive({
-    if (is.na(input$files[1])) {
-      # User has not uploaded a file yet
-      return(NULL)
-    } else {
-      inFile <- input$files$name
-      job_id = gsub(inFile, pattern="^f", replacement="")
-      job_id = str_extract(job_id, "\\d{6}")
-      #job_id = gsub(job_id, pattern="\\.csv", replacement="")
-      return(job_id)
-    }
-  })
-
+  
   
   ###Used to record golds and units worked on, as well as contributor location info
   distros <-reactive({
@@ -562,7 +515,6 @@ shinyServer(function(input, output, session) {
       full_by_worker = distros()
       
       if(input$id_chosen_profiles != ""){
-        print("collecting units seen")
         worker_profile = full_by_worker[full_by_worker$X_worker_id == input$id_chosen_profiles,]
         units_total = worker_profile$num_non_gold
         p(units_total)
@@ -580,7 +532,6 @@ shinyServer(function(input, output, session) {
       full_by_worker = distros()
       
       if(input$id_chosen_profiles != ""){
-        print("collecting golds seen")
         worker_profile = full_file_contrib_id()
         golds_seen = unique(worker_profile$X_unit_id[worker_profile$X_golden == "true"])
         if(length(golds_seen ) > 100){
@@ -643,52 +594,6 @@ shinyServer(function(input, output, session) {
         print(units_seen)
         print("L503")
       }
-    }
-  })
-
-profile_similar_workers <- reactive({
-    if (is.na(input$files[1])) {
-      # User has not uploaded a file yet
-      return(NULL)
-    } else {
-      profile_id = input$id_chosen_profiles
-      workers = agg_by_worker()
-      profile = workers[workers$X_worker_id == profile_id,]
-      workers = workers[workers$X_worker_id != profile_id,]
-      print(head(profile))
-      print(head(workers))
-      match = {}
-      
-      for(i in 1:length(workers$X_worker_id)){
-        
-        match[i] = "false" 
-        #print("How are we doing")
-      
-        if(workers$country[i] == profile$country){
-          if(workers$channel[i] == profile$channel){
-            match[i] = "true"
-            #print("Made it to 589")
-          }
-          if(workers$trust[i] == profile$trust){
-          #  match[i] = "true"
-            print("Made it to 593")
-          }
-        } 
-        
-        if(workers$num_judgments[i] == profile$num_judgments){
-          if(workers$trust[i] == profile$trust){
-            match[i] = "true"
-            #print("Made it to 600")
-          } 
-        }
-       }
-      
-      similar_workers = cbind(workers, match)
-      
-      similar_workers = 
-        similar_workers[similar_workers$match == "true",]
-      similar_workers
-      
     }
   })
   
@@ -816,62 +721,6 @@ profile_similar_workers <- reactive({
     }
   })
   
-output$create_similar_table <- renderText({
-    job_id = job_id()
-    if (is.na(input$files[1])) {
-      # User has not uploaded a file yet
-      return(NULL)
-    } else {
-      worker_table= profile_similar_workers()
-      if (length(worker_table$X_worker_id) > 50){
-        max_count = min(50, nrow(worker_table))
-        worker_table = worker_table[1:max_count,]
-      }
-      html_table = "<table border=1>"
-      worker_table$last_submit = as.character(worker_table$last_submit)
-      worker_table = rbind(names(worker_table),
-                           worker_table)
-      for (i in 1:nrow(worker_table)) {
-        this_row = worker_table[i,]
-        html_table = paste(html_table, '<tr>', sep="\n")
-        if (i == 1) {
-          for (value in this_row) {
-            html_table = paste(html_table, '<td>', sep="\n")
-            html_table = paste(html_table,
-                               paste("<b>",value, "</b>"),
-                               sep="\n") # pastes value!
-            html_table = paste(html_table, '</td>', sep="\n")
-          }
-        } else {
-          for (value_id in 1:length(this_row)) {
-            value = this_row[value_id]
-            html_table = paste(html_table, '<td>', sep="\n")
-            if (value_id == 1) {
-              value_link = paste("https://crowdflower.com/jobs/",
-                                 job_id,
-                                 "/contributors/",
-                                 value,
-                                 sep=""
-              )
-              value_to_paste= paste("<a href=\"",
-                                    value_link,
-                                    "\" target=\"_blank\">",
-                                    value,
-                                    "</a>")
-              html_table = paste(html_table, value_to_paste, sep="\n") # pastes value!
-            } else {
-              html_table = paste(html_table, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
-            }
-            html_table = paste(html_table, '</td>', sep="\n")
-          }
-        }
-        html_table = paste(html_table, '</tr>', sep="\n")
-      }
-      html_table = paste(html_table,"</table>", sep="\n")
-      paste(html_table)
-    }
-  })
-
   ###Create Single Profile Table of a contributor
   output$create_profile_table <- renderText({
     job_id = job_id()
@@ -992,7 +841,51 @@ output$create_similar_table <- renderText({
     }
   })
   
-  ## subset by country, channel, and last judgment for everyone not just worker table
+  profile_similar_workers <- reactive({
+    if (is.na(input$files[1])) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      profile_id = input$id_chosen_profiles
+      workers = agg_by_worker()
+      profile = workers[workers$X_worker_id == profile_id,]
+      workers = workers[workers$X_worker_id != profile_id,]
+      print(head(profile))
+      print(head(workers))
+      match = {}
+      
+      for(i in 1:length(workers$X_worker_id)){
+        
+        match[i] = "false" 
+        #print("How are we doing")
+        
+        if(workers$country[i] == profile$country){
+          if(workers$channel[i] == profile$channel){
+            match[i] = "true"
+            #print("Made it to 589")
+          }
+          if(workers$trust[i] == profile$trust){
+            #  match[i] = "true"
+            print("Made it to 593")
+          }
+        } 
+        
+        if(workers$num_judgments[i] == profile$num_judgments){
+          if(workers$trust[i] == profile$trust){
+            match[i] = "true"
+            #print("Made it to 600")
+          } 
+        }
+      }
+      
+      similar_workers = cbind(workers, match)
+      
+      similar_workers = 
+        similar_workers[similar_workers$match == "true",]
+      similar_workers
+      
+    }
+  })
   
   
   
@@ -1180,6 +1073,61 @@ output$create_similar_table <- renderText({
   
   ##Graphs and Plots  
   ##General Plot of contributor table, sortable.
+  output$create_similar_table <- renderText({
+    job_id = job_id()
+    if (is.na(input$files[1])) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      worker_table= profile_similar_workers()
+      if (length(worker_table$X_worker_id) > 50){
+        max_count = min(50, nrow(worker_table))
+        worker_table = worker_table[1:max_count,]
+      }
+      html_table = "<table border=1>"
+      worker_table$last_submit = as.character(worker_table$last_submit)
+      worker_table = rbind(names(worker_table),
+                           worker_table)
+      for (i in 1:nrow(worker_table)) {
+        this_row = worker_table[i,]
+        html_table = paste(html_table, '<tr>', sep="\n")
+        if (i == 1) {
+          for (value in this_row) {
+            html_table = paste(html_table, '<td>', sep="\n")
+            html_table = paste(html_table,
+                               paste("<b>",value, "</b>"),
+                               sep="\n") # pastes value!
+            html_table = paste(html_table, '</td>', sep="\n")
+          }
+        } else {
+          for (value_id in 1:length(this_row)) {
+            value = this_row[value_id]
+            html_table = paste(html_table, '<td>', sep="\n")
+            if (value_id == 1) {
+              value_link = paste("https://crowdflower.com/jobs/",
+                                 job_id,
+                                 "/contributors/",
+                                 value,
+                                 sep=""
+              )
+              value_to_paste= paste("<a href=\"",
+                                    value_link,
+                                    "\" target=\"_blank\">",
+                                    value,
+                                    "</a>")
+              html_table = paste(html_table, value_to_paste, sep="\n") # pastes value!
+            } else {
+              html_table = paste(html_table, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
+            }
+            html_table = paste(html_table, '</td>', sep="\n")
+          }
+        }
+        html_table = paste(html_table, '</tr>', sep="\n")
+      }
+      html_table = paste(html_table,"</table>", sep="\n")
+      paste(html_table)
+    }
+  })
   
   get_worker_table <- reactive({
     if (is.null(input$files[1]) || is.na(input$files[1])) {
@@ -1409,9 +1357,7 @@ output$create_similar_table <- renderText({
       p4
     }
     
-  })
-  
-  
+  }) 
   
   ############### this part controls displaying the stats ###############
   output$summary_message <- renderText({
@@ -1517,66 +1463,6 @@ output$create_similar_table <- renderText({
   },height=1000)
   
   output$offenders <- renderText({
-
-    df=full_file_scambot()
-    print("not broken")
-    threshold = input$threshold
-    print("Defined threshold, about to subset in Burminator")
-    df_under=df[which(df$time_duration_log<threshold),c("X_worker_id","X_ip", "time_duration")]
-    print("Subsetted judgments, about to subset workers in Burminator")
-    df = df[df$X_worker_id %in% df_under$X_worker_id,]
-    df$is_under_line = df$time_duration_log < threshold
-    print(table(df$is_under_line))
-    #print(df$time_duration)
-    print(typeof(df$X_worker_id))
-    print("probs about to break")
-    thou_dost_offend_me = ddply(df, .(X_worker_id), summarize,
-                                ip = X_ip[1],
-                                location = paste(X_city[1], X_country[1], sep=", "),
-                                channel = X_channel[1],
-                                min_assignment_time = min(time_duration),
-                                max_assignment_time = max(time_duration),
-                                num_judgments = length(time_duration),
-                                num_offenses = sum(is_under_line==TRUE))
-    thou_dost_offend_me$min_assignment_time = round(thou_dost_offend_me$min_assignment_time,2)
-    thou_dost_offend_me$max_assignment_time = round(thou_dost_offend_me$max_assignment_time,2)
-    
-    job_id = job_id()
-    html_offenders = "<table border=1>"
-    #worker_table$last_submit = as.character(worker_table$last_submit)
-    thou_dost_offend_me = rbind(names(thou_dost_offend_me),
-                                thou_dost_offend_me)
-    for (i in 1:nrow(thou_dost_offend_me)) {
-      this_row = thou_dost_offend_me[i,]
-      html_offenders = paste(html_offenders, '<tr>', sep="\n")
-      if (i == 1) {
-        for (value in this_row) {
-          html_offenders = paste(html_offenders, '<td>', sep="\n")
-          html_offenders = paste(html_offenders,
-                                 paste("<b>",value, "</b>"),
-                                 sep="\n") # pastes value!
-          html_offenders = paste(html_offenders, '</td>', sep="\n")
-        }
-      } else {
-        for (value_id in 1:length(this_row)) {
-          value = this_row[value_id]
-          html_offenders = paste(html_offenders, '<td>', sep="\n")
-          if (value_id == 1) {
-            value_link = paste("https://crowdflower.com/jobs/",
-                               job_id,
-                               "/contributors/",
-                               value,
-                               sep=""
-            )
-            value_to_paste= paste("<a href=\"",
-                                  value_link,
-                                  "\" target=\"_blank\">",
-                                  value,
-                                  "</a>")
-            html_offenders = paste(html_offenders, value_to_paste, sep="\n") # pastes value!
-          } else {
-            html_offenders = paste(html_offenders, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
-
     df=offenders_table()
     if (nrow(df) > 0) {
       print("probs about to break")
@@ -1628,7 +1514,6 @@ output$create_similar_table <- renderText({
               html_offenders = paste(html_offenders, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
             }
             html_offenders = paste(html_offenders, '</td>', sep="\n")
-
           }
         }
         html_offenders = paste(html_offenders, '</tr>', sep="\n")
@@ -1641,32 +1526,13 @@ output$create_similar_table <- renderText({
   })
   
   output$downloadData <- downloadHandler(
-    filename = function() { paste('scambot_',job_id(),'.csv', sep='') },
+    filename = function() { paste('offenders.csv', sep='') },
     content = function(file) {
-      dworkers=offenders_table()
-      df=df[,c("X_worker_id","X_ip")]
-      tpercent = mean( df$time_duration >= input$threshold)
-      cat("\n#############\n",file=stderr())
-      for(i in 1:nrow(dworkers)){
-        cat(dworkers[1,1],file=stderr())
-      }
-      cat("\n#############\n",file=stderr())
-      
-      # flag workers
-      flag_user = function(x) {
-        flag_head=paste("curl -X PUT \'https://crowdflower.com/jobs/", input$inFile,"/contributors/",sep='')
-        flag_tail="/reject?key=b0ddc5a1840a88c5c57be01fef888970ce9bbe08&reason=scambot_speed_violation_punch_these_guys_in_the_face\' -d \'\'"
-        system(paste(flag_head,x,flag_tail,sep=''))
-      }
-      cat("\n#############\n",file=stderr())
-      for(i in 1:nrow(dworkers)){
-        cat(dworkers[1,1],file=stderr())
-      }
-      cat("\n#############\n",file=stderr())
-      lapply(dworkers[,1],flag_user)
-      
-      #save to user's machine
-      write.csv(dworkers, paste(file,sep=''), row.names=F)
-    })  
-    
+      df=full_file_scambot()
+      df=df[which(df$time_duration_log<input$threshold),c("X_worker_id","X_ip")]
+      write.csv(df, file)
+    }
+  )  
+  
+  
 })
