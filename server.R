@@ -176,6 +176,8 @@ job_id <- reactive({
   if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
     # User has not uploaded a file yet
     return(NULL)
+  } else if (input$job_id > 0) {
+    return(input$job_id)
   } else {
     inFile <- input$files$name
     job_id = gsub(inFile, pattern="^f", replacement="")
