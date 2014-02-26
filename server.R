@@ -17,6 +17,7 @@ options(shiny.maxRequestSize=150*1024^2)
 
 source('add.times.R')
 source('trust_buckets.R')
+source('reject_user_function.R')
 
 
 shinyServer(function(input, output, session) {
@@ -1550,7 +1551,7 @@ shinyServer(function(input, output, session) {
           html_offenders = paste(html_offenders, '<button class="btn btn-danger action-button shiny-bound-input" data-toggle="button" id="get', this_row[1], '" type="button">Reject</button>' , sep="")
           html_offenders = paste(html_offenders, '</td>', sep="\n")
         }
-
+        
         html_offenders = paste(html_offenders, '</tr>', sep="\n")
       }
       html_offenders = paste(html_offenders,"</table>", sep="\n")
@@ -1574,19 +1575,24 @@ shinyServer(function(input, output, session) {
         print(potential_offenders)
         potential_gets = paste("get", potential_offenders, sep="")
         print(potential_gets)
+        ids_to_reject = c()
         for (i in 1:length(potential_gets)) {
           if(input[[potential_gets[i]]] == 0) {
             print(paste("this get", potential_gets[i], "has not been clicked yet"))
+            # int he future: remove from the flagged list
           } else {
             print(paste("this get", potential_gets[i], "got CLICKED. Yayyyyyy!"))
+            ids_to_reject = c(ids_to_reject, potential_offenders[i])
           }
         }
+        return(ids_to_reject)
       }
     }
   })
   
   output$flag_some_workers <- renderText({
-    flag_individual_workers()
+    ids_to_reject = flag_individual_workers()
+    lapply(ids_to_reject,flag_user)
     paste("")
   })
   
