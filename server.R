@@ -1498,12 +1498,12 @@ shinyServer(function(input, output, session) {
                                   ip = X_ip[1],
                                   location = paste(X_city[1], X_country[1], sep=", "),
                                   channel = X_channel[1],
-                                  min_assignment_time = min(time_duration),
-                                  max_assignment_time = max(time_duration),
+                                  min_time = min(time_duration),
+                                  max_time = max(time_duration),
                                   num_judgments = length(time_duration),
                                   num_offenses = sum(is_under_line==TRUE))
-      thou_dost_offend_me$min_assignment_time = round(thou_dost_offend_me$min_assignment_time,2)
-      thou_dost_offend_me$max_assignment_time = round(thou_dost_offend_me$max_assignment_time,2)
+      thou_dost_offend_me$min_time = round(thou_dost_offend_me$min_time,2)
+      thou_dost_offend_me$max_time = round(thou_dost_offend_me$max_time,2)
       
       job_id = job_id()
       html_offenders = "<table border=1>"
@@ -1547,7 +1547,7 @@ shinyServer(function(input, output, session) {
             html_offenders = paste(html_offenders, '</td>', sep="\n")
           }
           html_offenders = paste(html_offenders, '<td>', sep="\n")
-          html_offenders = paste(html_offenders, '<button class="btn btn-danger action-button shiny-bound-input" id="get', i, '" type="button">Reject</button>' , sep="")
+          html_offenders = paste(html_offenders, '<button class="btn btn-danger action-button shiny-bound-input" data-toggle="button" id="get', this_row[1], '" type="button">Reject</button>' , sep="")
           html_offenders = paste(html_offenders, '</td>', sep="\n")
         }
 
@@ -1558,6 +1558,36 @@ shinyServer(function(input, output, session) {
     } else {
       paste("<b>Looks like nobody fell under the red line!</b>")
     }
+  })
+  
+  
+  flag_individual_workers <- reactive({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      df=offenders_table()
+      if (nrow(df) == 0) {
+        return(NULL)
+      } else {
+        potential_offenders = unique(df$X_worker_id)
+        print(potential_offenders)
+        potential_gets = paste("get", potential_offenders, sep="")
+        print(potential_gets)
+        for (i in 1:length(potential_gets)) {
+          if(input[[potential_gets[i]]] == 0) {
+            print(paste("this get", potential_gets[i], "has not been clicked yet"))
+          } else {
+            print(paste("this get", potential_gets[i], "got CLICKED. Yayyyyyy!"))
+          }
+        }
+      }
+    }
+  })
+  
+  output$flag_some_workers <- renderText({
+    flag_individual_workers()
+    paste("")
   })
   
   output$downloadData <- downloadHandler(
