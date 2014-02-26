@@ -28,24 +28,9 @@ shinyServer(function(input, output, session) {
     paste(html_image)
     
   })
-  # the picture of Scamlock Holmes to go into tis tab
-  output$scamlock <- renderText ({
-    image_path = "http://cf-public-view.s3.amazonaws.com/catherine/Scamlock%20Holmes.png"
-    html_image = paste("<img src=", image_path, " width=\"20%\" align=\"right\"/>", sep="")
-    
-    paste(html_image)
-    
-  })
-  
+
   ### read in file 
   full_file_raw <- reactive({
-    #     if (is.null(input$files[1]) && input$job_id==0) {
-    #       # User has not uploaded a file yet
-    #       return(NULL)
-    #     } else {
-    #       inFile <- input$files
-    #       full_file = read.csv(inFile$datapath, na.strings="NaN", stringsAsFactors=FALSE)
-    #       return(full_file)
     
     if (is.null(input$files) && input$job_id==0) {
       # User has not uploaded a file yet
