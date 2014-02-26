@@ -96,7 +96,6 @@ shinyServer(function(input, output, session) {
                         num_judgments = length(X_worker_id))
       
       full_file = add.times(full_file)
-      View(full_file)
       return(full_file)
     }
   })
