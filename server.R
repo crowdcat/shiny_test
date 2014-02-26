@@ -1592,16 +1592,21 @@ shinyServer(function(input, output, session) {
   
   output$flag_some_workers <- renderText({
     ids_to_reject = flag_individual_workers()
-    lapply(ids_to_reject,flag_user)
+    lapply(ids_to_reject, function(x) reject_user(job_id = job_id(), x=x))
     paste("")
   })
   
   output$downloadData <- downloadHandler(
     filename = function() { paste('offenders.csv', sep='') },
     content = function(file) {
-      df=full_file_scambot()
-      df=df[which(df$time_duration_log<input$threshold),c("X_worker_id","X_ip")]
-      write.csv(df, file)
+      df=offenders_table()
+      if (nrow(df) == 0) {
+        return(NULL)
+      } else {
+        ids_to_reject = unique(df$X_worker_id)
+        lapply(ids_to_reject, function(x) reject_user(job_id = job_id(), x=x))
+      }
+      write.csv(df, paste(file,sep=''), row.names=F, na="")
     }
   )  
   
