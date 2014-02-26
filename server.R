@@ -875,7 +875,7 @@ shinyServer(function(input, output, session) {
       workers = workers[workers$X_worker_id != profile_id,]
       print(head(profile))
       print(head(workers))
-      match = {}
+      match = c()
       
       for(i in 1:length(workers$X_worker_id)){
         
