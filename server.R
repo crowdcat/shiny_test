@@ -19,7 +19,6 @@ source('add.times.R')
 source('trust_buckets.R')
 
 
-
 shinyServer(function(input, output, session) {
   ### Render Image
   output$futurama <- renderText ({
@@ -625,12 +624,12 @@ shinyServer(function(input, output, session) {
   ###Create Output Tables 
   ##By Contributor ID
   output$create_html_table <- renderText({
-    job_id = job_id()
     if (is.null(input$files[1]) || is.na(input$files[1])) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      worker_table= live_worker_table()
+      job_id = job_id()
+      worker_table_spss= live_worker_table()
       if (length(worker_table$X_worker_id) > 50){
         max_count = min(50, nrow(worker_table))
         worker_table = worker_table[1:max_count,]
