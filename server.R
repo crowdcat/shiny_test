@@ -19,6 +19,12 @@ source('add.times.R')
 source('trust_buckets.R')
 source('reject_user_function.R')
 
+comparisons = c("country", "trust", "channel", "num_judgments")
+icons = c('<i class="icon-large icon-globe"></i>',
+          '<i class="icon-large icon-heart"></i>',
+          '<i class="icon-large icon-home"></i>',
+          '<i class="icon-large icon-signal"></i>')
+
 
 shinyServer(function(input, output, session) {
   ### Render Image
@@ -28,7 +34,7 @@ shinyServer(function(input, output, session) {
     paste(html_image)
     
   })
-
+  
   ### read in file 
   full_file_raw <- reactive({
     
@@ -296,6 +302,7 @@ shinyServer(function(input, output, session) {
                   value = c(trust_levels[1] - .001, trust_levels[2] + .001), step=.001)
     }
   })
+
   
   output$countrySelector <- renderUI({
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
@@ -865,7 +872,7 @@ shinyServer(function(input, output, session) {
   })
   
   profile_similar_workers <- reactive({
-    if (is.na(input$files[1])) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -875,42 +882,68 @@ shinyServer(function(input, output, session) {
       workers = workers[workers$X_worker_id != profile_id,]
       print(head(profile))
       print(head(workers))
-      match = c()
+      match = list()
+      match_sum = c()
+      match_string = c()
       
-      for(i in 1:length(workers$X_worker_id)){
-        
-        match[i] = "false" 
+      for(i in 1:length(workers$X_worker_id)){     
+        match[[i]] = rep(FALSE, times=length(comparisons)) # times needs to be equal to the number of conditions
         #print("How are we doing")
         
         if(workers$country[i] == profile$country){
-          if(workers$channel[i] == profile$channel){
-            match[i] = "true"
-            #print("Made it to 589")
-          }
-          if(workers$trust[i] == profile$trust){
-            #  match[i] = "true"
-            print("Made it to 593")
-          }
-        } 
+          match[[i]][1] = TRUE
+        }
+        
+        if(workers$channel[i] == profile$channel){
+          match[[i]][2] = TRUE
+          #print("Made it to 589")
+        }
+        
+        if(workers$trust[i] == profile$trust){
+          match[[i]][3] = TRUE
+        }
         
         if(workers$num_judgments[i] == profile$num_judgments){
-          if(workers$trust[i] == profile$trust){
-            match[i] = "true"
-            #print("Made it to 600")
-          } 
+          match[[i]][4] = TRUE
         }
+        match_sum[i] = sum(match[[i]])  # true if there were two or more matches
+        match_string[i] = paste(icons[match[[i]]], collapse="")
+
       }
       
-      similar_workers = cbind(workers, match)
+      similar_workers = cbind(workers, match_sum, match_string)
       
       similar_workers = 
-        similar_workers[similar_workers$match == "true",]
+        similar_workers[similar_workers$match_sum > 2,] 
+      similar_workers = similar_workers[order(-similar_workers$match_sum),]
+      similar_workers$match_sum = NULL
       similar_workers
       
     }
   })
   
-  
+  output$similarity_legend <- renderText({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      string = "Legend: each icon means similar by... <br> <table>"
+      for (i in 1:length(comparisons)) {
+        string = paste(string, "<tr>")
+        string = paste(string, "<td>")
+        string = paste(string, icons[i])
+        string = paste(string, "</td>")
+        
+        string = paste(string, "<td>")
+        string = paste(string, comparisons[i])
+        string = paste(string, "</td>")
+        
+        string = paste(string, "</tr>")
+      }
+      string = paste(string, "</table>")
+      paste(string)
+    }
+  })
   
   #### Contributor Table Reacts to Functions Inputs is loaded in create_html_table #### 
   live_worker_table <- reactive({
@@ -1098,7 +1131,7 @@ shinyServer(function(input, output, session) {
   ##General Plot of contributor table, sortable.
   output$create_similar_table <- renderText({
     job_id = job_id()
-    if (is.na(input$files[1])) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
       # User has not uploaded a file yet
       return(NULL)
     } else {

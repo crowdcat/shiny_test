@@ -6,7 +6,6 @@ require('shiny')
 require('rCharts')
 require('devtools')
 
-
 shinyUI(pageWithSidebar(
   headerPanel("Contributor Slice-orama 4000"),
   sidebarPanel(
@@ -30,7 +29,6 @@ shinyUI(pageWithSidebar(
     tags$style(type="text/css", ".tab-content { overflow: visible; }", "svg { height: 150%; }")
   ),
   mainPanel(
-    tags$style(type="text/css", ".nav-tabs>li { max-width: 100px;}"),
     tabsetPanel(
       tabPanel("Contributor IDs Table",
                uiOutput("titleTextContributors"),
@@ -77,6 +75,7 @@ shinyUI(pageWithSidebar(
                           showOutput("profile_golds_distros", "nvd3"),
                           htmlOutput("goldDistrosExplain")),
                  tabPanel("Similar Workers",
+                          htmlOutput("similarity_legend"),
                           htmlOutput("create_similar_table")))
                
       ),
