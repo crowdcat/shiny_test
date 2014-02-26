@@ -302,7 +302,7 @@ shinyServer(function(input, output, session) {
                   value = c(trust_levels[1] - .001, trust_levels[2] + .001), step=.001)
     }
   })
-
+  
   
   output$countrySelector <- renderUI({
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
@@ -908,7 +908,7 @@ shinyServer(function(input, output, session) {
         }
         match_sum[i] = sum(match[[i]])  # true if there were two or more matches
         match_string[i] = paste(icons[match[[i]]], collapse="")
-
+        
       }
       
       similar_workers = cbind(workers, match_sum, match_string)
@@ -1457,6 +1457,8 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       df = full_file()
+      worker_submit_time = paste(df$X_worker_id, df$time_start, sep="_")
+      df = df[!duplicated(worker_submit_time),]
       qnt=quantile(df$time_duration_log,probs=c(0.5,0.10,0.05))
       p = ggplot(df, aes_string(x="time_start", y="time_duration_log", color="X_trust")) +
         geom_point(color="gainsboro") +
@@ -1492,12 +1494,14 @@ shinyServer(function(input, output, session) {
     }
   })
   
-  output$plot <- renderPlot({
+  plot_before_offenders <- reactive({
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
       new_df = subsetted_file()
+      worker_submit_time = paste(new_df$X_worker_id, new_df$time_start, sep="_")
+      new_df = new_df[!duplicated(worker_submit_time),]
       p = premade_scambot_plot()
       # add new data
       if (nrow(new_df) >0) {
@@ -1505,6 +1509,17 @@ shinyServer(function(input, output, session) {
         p = p + geom_point(data=new_df,aes_string(color="X_trust")) +
           scale_colour_brewer(palette="PiYG")
       }
+      p
+    }
+  })
+  
+  
+  output$plot <- renderPlot({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      p = plot_before_offenders()
       # add the red line
       if (!is.null(input$threshold) || !is.na(input$threshold)) {
         p = p + geom_hline(yintercept=input$threshold,color="darkorange")
