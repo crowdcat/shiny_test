@@ -1219,22 +1219,27 @@ shinyServer(function(input, output, session) {
         
         individual = as.data.frame(responses[[question_index]])
         all = as.data.frame(responses_all[[question_index]])
-        missing_var1 = all$Var1[!(all$Var1 %in% individual$Var1)]
-        missing_rows = data.frame(Var1 =missing_var1, Freq = 0 )
-        individual = rbind(individual, missing_rows)
+        View(individual)
+        View(all)
         
+        missing_var1 = all$Var1[!(all$Var1 %in% individual$Var1)]
+        if (length(missing_var1) != 0){
+          missing_rows = data.frame(Var1 = missing_var1, Freq = 0 )
+          individual = rbind(individual, missing_rows)
+        }
         #View(individual)
         #View(all)
+       
         responses_table_bind = rbind(individual, all)
         group_var = c(rep("individual", times=nrow(individual)),
                       rep("all", times=nrow(all)))
         responses_table_bind$group_var = group_var
-        #View(responses_table_bind)
+        View(responses_table_bind)
         
         responses_table_transformed = data.frame(questions = as.character(responses_table_bind$Var1), 
                                                  numbers = as.numeric(responses_table_bind$Freq),
                                                  group = responses_table_bind$group_var)
-        #View(responses_table_transformed)
+        View(responses_table_transformed)
         
         #responses_table_transformed = responses_table_transformed[1:3]
         #          if (nrow(responses_table_transformed) > 9 ) {
