@@ -663,7 +663,7 @@ shinyServer(function(input, output, session) {
       job = job_id()
       table= live_worker_table()
       prepare_html_table(worker_table = table, job_id = job)
-
+      
     }
   })
   
@@ -1047,7 +1047,7 @@ shinyServer(function(input, output, session) {
   ##Graphs and Plots  
   ##General Plot of contributor table, sortable.
   output$create_similar_table <- renderText({
- 
+    
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
       # User has not uploaded a file yet
       return(NULL)
@@ -1086,11 +1086,11 @@ shinyServer(function(input, output, session) {
       # User has not uploaded a file yet
       return(NULL)
     } else { 
-      print('Starting the Plot Workers Chart')
+      # print('Starting the Plot Workers Chart')
       workers = get_worker_table()
-      print(paste("Input chosen",input$group_chosen))
+      # print(paste("Input chosen",input$group_chosen))
       if(input$group_chosen != "trust"){
-        print(names(workers))
+        # print(names(workers))
         p6 <- nPlot(num_judgments ~ X_worker_id, group=input$group_chosen, data = workers, type='multiBarChart', 
                     dom='plot_workers', width=800)
         p6$xAxis(rotateLabels=45)
@@ -1102,14 +1102,14 @@ shinyServer(function(input, output, session) {
         if (sum(duplicated(this_fiver))>0) {
           this_fiver = unique(this_fiver)
         }
-        print("Printing fiver from which_bucket")
-        print(this_fiver)
-        print("Head of trust scores for which_bucket")
-        print(head(workers$trust))
+        #  print("Printing fiver from which_bucket")
+        #  print(this_fiver)
+        #  print("Head of trust scores for which_bucket")
+        #  print(head(workers$trust))
         workers$trust_buckets = sapply(workers$trust,
                                        function(k) which_bucket(y=k,
                                                                 fiver=this_fiver))
-        
+        workers = workers[order(workers$trust_buckets, decreasing=F),]
         p6 <- nPlot(num_judgments ~ X_worker_id, group='trust_buckets', 
                     data = workers, type='multiBarChart', dom='plot_workers', width=800)
         
@@ -1182,7 +1182,6 @@ shinyServer(function(input, output, session) {
   
   ###Individual Contributor Unit Distributions
   output$profile_units_distros <- renderChart({
-    #full_file_unit_answers <- reactive(function(){
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
       # User has not uploaded a file yet
       #return(NULL)
@@ -1217,27 +1216,35 @@ shinyServer(function(input, output, session) {
           responses_all = table(full_file_all[,names(full_file_all)==y])
           responses_all/sum(responses_all)
         })
-  
-        individual = responses[[question_index]]
-        all = responses_all[[question_index]]
         
+        individual = as.data.frame(responses[[question_index]])
+        all = as.data.frame(responses_all[[question_index]])
+        missing_var1 = all$Var1[!(all$Var1 %in% individual$Var1)]
+        missing_rows = data.frame(Var1 =missing_var1, Freq = 0 )
+        individual = rbind(individual, missing_rows)
+        
+        #View(individual)
+        #View(all)
         responses_table_bind = rbind(individual, all)
+        group_var = c(rep("individual", times=nrow(individual)),
+                      rep("all", times=nrow(all)))
+        responses_table_bind$group_var = group_var
+        #View(responses_table_bind)
         
-        responses_table_transformed = data.frame(questions = rep(colnames(responses_table_bind), 
-                                                                 each=nrow(responses_table_bind)),
-                                                 numbers = as.numeric(responses_table_bind),
-                                                 group = rep(row.names(responses_table_bind), 
-                                                             rep=ncol(responses_table_bind)))
+        responses_table_transformed = data.frame(questions = as.character(responses_table_bind$Var1), 
+                                                 numbers = as.numeric(responses_table_bind$Freq),
+                                                 group = responses_table_bind$group_var)
+        #View(responses_table_transformed)
         
         #responses_table_transformed = responses_table_transformed[1:3]
-#          if (nrow(responses_table_transformed) > 9 ) {
-#            responses_table_transformed1 = responses_table_transformed[1:9,]
-#            responses_table_transformed1[10,] =
-#              c("Other Values", sum(responses_table_transformed$numbers[10:length(responses_table_transformed)]),
-#                profile_chosen_q)
-#            responses_table_transformed = responses_table_transformed1
-#          }
-#         
+        #          if (nrow(responses_table_transformed) > 9 ) {
+        #            responses_table_transformed1 = responses_table_transformed[1:9,]
+        #            responses_table_transformed1[10,] =
+        #              c("Other Values", sum(responses_table_transformed$numbers[10:length(responses_table_transformed)]),
+        #                profile_chosen_q)
+        #            responses_table_transformed = responses_table_transformed1
+        #          }
+        #         
         responses_table_transformed$questions[responses_table_transformed$questions==""] = "\"\""
         
         p2 <- nPlot(numbers ~ questions, data=responses_table_transformed, group = 'group',
@@ -1285,17 +1292,30 @@ shinyServer(function(input, output, session) {
         responses_all/sum(responses_all)
       })
       
-      individual = responses[[question_index]]
-      all = responses_all[[question_index]]
+      #individual = responses[[question_index]]
+      #all = responses_all[[question_index]]
+      individual = as.data.frame(responses[[question_index]])
+      all = as.data.frame(responses_all[[question_index]])
+      missing_var1 = all$Var1[!(all$Var1 %in% individual$Var1)]
+      missing_rows = data.frame(Var1 =missing_var1, Freq = 0 )
+      individual = rbind(individual, missing_rows)
       
       responses_table_bind = rbind(individual, all)
+      group_var = c(rep("individual", times=nrow(individual)),
+                    rep("all", times=nrow(all)))
+      responses_table_bind$group_var = group_var
       
-      responses_table_transformed = data.frame(questions = rep(colnames(responses_table_bind), 
-                                                               each=nrow(responses_table_bind)),
-                                               numbers = as.numeric(responses_table_bind),
-                                               group = rep(row.names(responses_table_bind), 
-                                                           rep=ncol(responses_table_bind)))
-     
+   #   responses_table_transformed = data.frame(questions = rep(colnames(responses_table_bind), 
+   #                                                            each=nrow(responses_table_bind)),
+  #                                             numbers = as.numeric(responses_table_bind),
+  #                                             group = rep(row.names(responses_table_bind), 
+  #                                                         rep=ncol(responses_table_bind)))
+      
+      responses_table_transformed = data.frame(questions = as.character(responses_table_bind$Var1), 
+                                               numbers = as.numeric(responses_table_bind$Freq),
+                                               group = responses_table_bind$group_var)
+      
+      responses_table_transformed$questions[responses_table_transformed$questions==""] = "\"\""
       
       p4 <- nPlot(numbers ~ questions, data=responses_table_transformed, group = 'group',
                   type='multiBarChart', dom='profile_golds_distros') 
