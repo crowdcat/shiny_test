@@ -6,12 +6,10 @@ require('shiny')
 require('rCharts')
 require('devtools')
 
-
 shinyUI(pageWithSidebar(
   headerPanel("Contributor Slice-orama 4000"),
-  
-  
   sidebarPanel(
+    numericInput("job_id", h4("Paste your job id here"), 0),
     fileInput("files", h4("Select a full report:"), multiple=FALSE, 
               accept=c('text/csv', 'text/comma-separated-values,text/plain', '.csv')),
     h4("***"),
@@ -77,6 +75,7 @@ shinyUI(pageWithSidebar(
                           showOutput("profile_golds_distros", "nvd3"),
                           htmlOutput("goldDistrosExplain")),
                  tabPanel("Similar Workers",
+                          htmlOutput("similarity_legend"),
                           htmlOutput("create_similar_table")))
                
       ),
@@ -118,17 +117,32 @@ shinyUI(pageWithSidebar(
                textInput(inputId="ip_chosen", label="Search by IP:", value=""),
                htmlOutput("create_html_table_ip")
       ),
-      tabPanel("Scambot:Plot",
-               plotOutput('plot',height=1000),
-               p("The judgments of workers that fall under the red line are highlighted in red. You can reject these people and remove their judgments in Burminator.")),
-      tabPanel("Scambot: Burninator", downloadButton('downloadData', 'Flag these workers'),
-               htmlOutput("offenders"),
-               p(),
-               p("Burninator How-to:"),
-               p("You can click on blue ids under X_worker_id to see the workers' profile pages in the platform."),
-               p("All times on this page (max_assignment_time and min_assignment_time) are in fractions of a second. So \"5.53\" is 5 seconds 53 hundreds of a second.")
+      tabPanel("Scambot", 
+               tabsetPanel(
+                 tabPanel("Plot & Choose",
+                          plotOutput('plot',height=1000),
+                          p("The judgments of workers that fall under the red line are highlighted in red. You can reject these people and remove their judgments in Burminator.")),
+                 tabPanel("Reject Workers", 
+                          downloadButton('downloadData', 'Reject ALL workers below'),
+                          tags$style(type="text/css", 
+                                     ".shiny-download-link { background-color: #da4f49;background-image: -moz-linear-gradient(top,#ee5f5b,#bd362f);
+                          background-image: -webkit-gradient(linear,0 0,0 100%,from(#ee5f5b),to(#bd362f));
+                          background-image: -webkit-linear-gradient(top,#ee5f5b,#bd362f);
+                          background-image: -o-linear-gradient(top,#ee5f5b,#bd362f);
+                          background-image: linear-gradient(to bottom,#ee5f5b,#bd362f);
+                          background-repeat: repeat-x;
+                          color: #fff;}"),
+                          p(),
+                          htmlOutput("flag_some_workers"),
+                          htmlOutput("offenders"),
+                          p(),
+                          p("Burninator How-to:"),
+                          p("You can click on blue ids under X_worker_id to see the workers' profile pages in the platform."),
+                          p("All times on this page (max_assignment_time and min_assignment_time) are in fractions of a second. So \"5.53\" is 5 seconds 53 hundreds of a second.")
+                 )
+               ) 
       )
-      #    ) 
+      
     )
   )        
 ))  
