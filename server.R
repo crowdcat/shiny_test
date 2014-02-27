@@ -1194,6 +1194,7 @@ shinyServer(function(input, output, session) {
         return(NULL)
       } else {
         full_file = full_file_contrib_id()
+        full_file_all = full_file()
         answer_cols = grepl(pattern=".\\gold$", names(full_file)) &
           !grepl(pattern=".\\golden",names(full_file))
         answer_cols_names = names(full_file)[answer_cols]
@@ -1210,26 +1211,38 @@ shinyServer(function(input, output, session) {
         responses = lapply(answer_cols_names, function(x) {
           responses = table(full_file[,names(full_file)==x])
           responses/sum(responses)
-        }
-        )
-        print("Question chosen")
-        print(profile_chosen_q)
-        print("Index of question")
-        print(question_index)
-        print("df to subset")
-        print(responses)
-        responses_table = responses[[question_index]]
-        responses_table = responses_table[order(responses_table)]
+        })
         
-        responses_table_transformed = data.frame(questions = names(responses_table),
-                                                 numbers = as.numeric(responses_table),
-                                                 group = profile_chosen_q)
+        responses_all = lapply(answer_cols_names, function(y){
+          responses_all = table(full_file_all[,names(full_file_all)==y])
+          responses_all/sum(responses_all)
+        })
+  
+        individual = responses[[question_index]]
+        all = responses_all[[question_index]]
         
-        responses_table_transformed = responses_table_transformed[1:3]
+        responses_table_bind = rbind(individual, all)
+        
+        responses_table_transformed = data.frame(questions = rep(colnames(responses_table_bind), 
+                                                                 each=nrow(responses_table_bind)),
+                                                 numbers = as.numeric(responses_table_bind),
+                                                 group = rep(row.names(responses_table_bind), 
+                                                             rep=ncol(responses_table_bind)))
+        
+        #responses_table_transformed = responses_table_transformed[1:3]
+#          if (nrow(responses_table_transformed) > 9 ) {
+#            responses_table_transformed1 = responses_table_transformed[1:9,]
+#            responses_table_transformed1[10,] =
+#              c("Other Values", sum(responses_table_transformed$numbers[10:length(responses_table_transformed)]),
+#                profile_chosen_q)
+#            responses_table_transformed = responses_table_transformed1
+#          }
+#         
+        responses_table_transformed$questions[responses_table_transformed$questions==""] = "\"\""
         
         p2 <- nPlot(numbers ~ questions, data=responses_table_transformed, group = 'group',
                     type='multiBarChart', dom='profile_units_distros') 
-        x_label = paste('Answers from', input$id_chosen_profiles, sep=" ")
+        x_label = paste('Answers from', input$id_chosen_profiles, 'compared to total answer distributions.', sep=" ")
         p2$xAxis(rotateLabels=45)
         p2$xAxis(axisLabel=x_label)
         p2$chart(reduceXTicks = FALSE)
@@ -1248,6 +1261,7 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       full_file = full_file_contrib_id()
+      full_file_all = full_file()
       answer_cols = grepl(pattern=".\\gold$", names(full_file)) &
         !grepl(pattern=".\\golden",names(full_file))
       answer_cols_names = names(full_file)[answer_cols]
@@ -1264,20 +1278,29 @@ shinyServer(function(input, output, session) {
       responses = lapply(answer_cols_names, function(x) {
         responses = table(full_file[,names(full_file)==x])
         responses/sum(responses)
-      }
-      )
+      })
       
-      responses_table = responses[[question_index]]
-      responses_table = responses_table[order(responses_table)]
+      responses_all = lapply(answer_cols_names, function(y){
+        responses_all = table(full_file_all[,names(full_file_all)==y])
+        responses_all/sum(responses_all)
+      })
       
-      responses_table_transformed = data.frame(questions = names(responses_table),
-                                               numbers = as.numeric(responses_table),
-                                               group = profile_chosen_q)
+      individual = responses[[question_index]]
+      all = responses_all[[question_index]]
+      
+      responses_table_bind = rbind(individual, all)
+      
+      responses_table_transformed = data.frame(questions = rep(colnames(responses_table_bind), 
+                                                               each=nrow(responses_table_bind)),
+                                               numbers = as.numeric(responses_table_bind),
+                                               group = rep(row.names(responses_table_bind), 
+                                                           rep=ncol(responses_table_bind)))
+     
       
       p4 <- nPlot(numbers ~ questions, data=responses_table_transformed, group = 'group',
                   type='multiBarChart', dom='profile_golds_distros') 
       
-      x_label = paste('Answers on Golds from', input$id_chosen_profiles, sep=" ")
+      x_label = paste('Answers on golds from', input$id_chosen_profiles, 'compared to the total answer distributions on golds.', sep=" ")
       
       p4$xAxis(rotateLabels=45)
       

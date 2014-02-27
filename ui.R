@@ -26,7 +26,7 @@ shinyUI(pageWithSidebar(
     uiOutput("scambotSelector"),
     htmlOutput("summary_message"),
     htmlOutput("futurama"),
-    tags$style(type="text/css", ".tab-content { overflow: visible; }", "svg { height: 150%; }")
+    tags$style(type="text/css", ".tab-content { overflow: visible; }", ".svg { height: 150%; }")
   ),
   mainPanel(
     tabsetPanel(
