@@ -30,6 +30,13 @@ shinyUI(pageWithSidebar(
   ),
   mainPanel(
     tabsetPanel(
+      tabPanel("Summary",
+               h4("Times:"),
+               uiOutput("summary_times"),
+               h4("10 Most Listed Countries:"),
+               uiOutput("summary_stats_country"),
+               h4("10 Most Listed Channels:"),
+               uiOutput("summary_stats_channel")),
       tabPanel("Contributor IDs Table",
                uiOutput("titleTextContributors"),
                selectInput(inputId = "sortby_chosen", label= "Sort By:",
@@ -123,7 +130,8 @@ shinyUI(pageWithSidebar(
                           plotOutput('plot',height=1000),
                           p("The judgments of workers that fall under the red line are highlighted in red. You can reject these people and remove their judgments in Burminator.")),
                  tabPanel("Reject Workers", 
-                          downloadButton('downloadData', 'Reject ALL workers below'),
+                          uiOutput("dowloadSelector"),
+                          uiOutput("actionSelector"),
                           tags$style(type="text/css", 
                                      ".shiny-download-link { background-color: #da4f49;background-image: -moz-linear-gradient(top,#ee5f5b,#bd362f);
                           background-image: -webkit-gradient(linear,0 0,0 100%,from(#ee5f5b),to(#bd362f));

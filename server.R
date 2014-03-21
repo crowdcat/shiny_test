@@ -13,12 +13,13 @@ require('devtools')
 
 options(stringsAsFactors=F)
 #increase max to 150 MB
-options(shiny.maxRequestSize=150*1024^2)
+options(shiny.maxRequestSize=1000*1024^2)
 
 source('add.times.R')
 source('trust_buckets.R')
 source('prepare_html_table.R')
 source('reject_user_function.R')
+source('flag_user_function.R')
 
 comparisons = c("country", "trust", "channel", "num_judgments")
 icons = c('<i class="icon-large icon-globe"></i>',
@@ -44,7 +45,7 @@ shinyServer(function(input, output, session) {
       # User has not uploaded a file yet
       return(NULL)
     } else if (input$job_id > 0) {
-      print("In job id")
+      
       inFile = input$job_id
       #tryCatch(
       system(paste('s3cmd --force get s3://crowdflower_prod/f',
@@ -98,6 +99,8 @@ shinyServer(function(input, output, session) {
                         num_judgments = length(X_worker_id))
       
       full_file = add.times(full_file)
+      print("Line 101 print full file with times")
+      print(head(full_file))
       return(full_file)
     }
   })
@@ -110,29 +113,21 @@ shinyServer(function(input, output, session) {
     } else {    
       full_by_worker = full_file()
       
-      print("DF from subsetted_file")
-      print(head(full_by_worker))
-      
       if (input$country_chosen != "all_countries") {
-        print("Subsetting by country")
         full_by_worker = full_by_worker[full_by_worker$X_country == input$country_chosen,]
         
       }
       
       if (input$channel_chosen != "all_channels") {
-        print("Subsetting by channel")
         full_by_worker = full_by_worker[full_by_worker$X_channel == input$channel_chosen,]
       }
       
       if(input$time_chosen != "none"){
-        print("Subsetting by time")
         current_time = as.POSIXlt(Sys.time(), "GMT")
-        print(current_time)
         if(input$time_chosen == "thirty_mins"){
           #subtracting 30 mins from current time
           time = current_time - 1800
           full_by_worker = full_by_worker[full_by_worker$last_submit >= time, ]
-          
         }
         else if (input$time_chosen == "last_hr"){
           time = current_time - 3600
@@ -158,18 +153,88 @@ shinyServer(function(input, output, session) {
       }
       
       if (!is.null(input$num_judgs)) {
-        print("Subsetting by judgments")
         full_by_worker = full_by_worker[full_by_worker$num_judgments <= max(input$num_judgs) &
                                           full_by_worker$num_judgments >= min(input$num_judgs),]
         
       }
       
       if (!is.null(input$trust_chosen)) {
-        print("Subsetting by trust")
         full_by_worker = full_by_worker[full_by_worker$X_trust <= max(input$trust_chosen) &
                                           full_by_worker$X_trust >= min(input$trust_chosen),]
       }
       full_by_worker
+    }
+  })
+  
+  output$summary_stats_country <- renderTable({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      workers = agg_by_worker()
+      total = nrow(workers)
+      num_countries = table(workers$country)
+      num_countries = as.data.frame(num_countries)
+      for(i in 1:nrow(num_countries)){
+        num_countries$percent[i] =
+          num_countries$Freq[i]/total
+        num_countries
+      }
+      num_countries = num_countries[order(num_countries$Freq, decreasing=T),]
+      if(nrow(num_countries) > 10){
+        max_count = min(10, nrow(num_countries))
+        num_countries = num_countries[1:max_count,]
+      }
+      num_countries
+    }
+  })
+  
+  output$summary_stats_channel <- renderTable({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      workers = agg_by_worker()
+      total = nrow(workers)
+      num_channels = table(workers$channel)
+      num_channels = as.data.frame(num_channels)
+      for(i in 1:nrow(num_channels)){
+        num_channels$percent[i] =
+          num_channels$Freq[i]/total
+        num_channels
+      }
+      num_channels = num_channels[order(num_channels$Freq, decreasing=T),]
+      if(nrow(num_channels) > 10){
+        max_count = min(10, nrow(num_channels))
+        num_channels = num_channels[1:max_count,]
+      }
+      num_channels
+    }
+  })
+  
+  output$summary_times <- renderText({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      times_file = full_file()
+      max_time = max(times_file$time_duration)
+      #max_time
+      print("line 222")
+      print(max_time)
+      
+      min_time = min(times_file$time_duration)
+      print(min_time)
+      #min_time
+      
+      avg_time = mean(times_file$time_duration)
+      print(avg_time)
+      
+      min_m = paste("Minimum completion time: ", min_time, sep="")
+      max_m = paste("Maximum completion time: ", max_time, sep="")
+      avg_m = paste("Average completion time: ", avg_time, sep="")
+      puts = paste(min_m, max_m, avg_m, sep="<br>")
+      puts
     }
   })
   
@@ -184,7 +249,6 @@ shinyServer(function(input, output, session) {
       inFile <- input$files$name
       job_id = gsub(inFile, pattern="^f", replacement="")
       job_id = str_extract(job_id, "\\d{6}")
-      #job_id = gsub(job_id, pattern="\\.csv", replacement="")
       return(job_id)
     }
   })
@@ -196,7 +260,6 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       full_file = subsetted_file()
-      print("Before ddply in agg_by_worker")
       agg_by_worker = ddply(full_file, .(X_worker_id), summarize,
                             channel = X_channel[1],
                             country = X_country[1],
@@ -206,8 +269,6 @@ shinyServer(function(input, output, session) {
                             untrusted = X_tainted[1],
                             last_submit = last_submit[1],
                             num_judgments = num_judgments[1])
-      print("After ddply in agg_by_worker")
-      print(names(agg_by_worker))
       agg_by_worker
     }
   })
@@ -229,7 +290,6 @@ shinyServer(function(input, output, session) {
                          untrusted = X_tainted[1],
                          last_submit_ip = X_created_at[length(X_created_at)],
                          num_judgments_ip = length(X_ip))
-      #test_qs_seen_ip = length(X_ip[X_golden=='true']))
       
       full_by_ip
     }
@@ -290,7 +350,6 @@ shinyServer(function(input, output, session) {
   #### Selector for left panel! #### 
   ##SIDEBAR PANEL###
   output$trustSelector <- renderUI({
-    print(input$files)
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
       # User has not uploaded a file yet
       return(NULL)
@@ -323,7 +382,6 @@ shinyServer(function(input, output, session) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      
       workers = full_file()
       workers_list = unique(workers$X_channel)
       alpha_workers = sort(workers_list)
@@ -338,9 +396,6 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       worker_times = full_file()
-      #worker_times = add.times(worker_times)
-      print(head(worker_times$last_submit))
-      print(min(worker_times$last_submit))
       selectInput(inputId = "time_chosen", label="Latest Submissions",
                   c("Select One" = "none",
                     "Last 30 Minutes" = "thirty_mins",
@@ -360,11 +415,7 @@ shinyServer(function(input, output, session) {
       
       workers = subsetted_file()
       workers_ip = agg_by_ip()
-      judg_levels = c()
-      print("IP min")
-      print(min(workers_ip$num_judgments_ip))
-      print("ID min")
-      print(min(workers$num_judgments))      
+      judg_levels = c()   
       if (min(workers_ip$num_judgments_ip) < min(workers$num_judgments)){
         judg_levels[1] = min(workers_ip$num_judgments_ip)
       } else {
@@ -377,8 +428,6 @@ shinyServer(function(input, output, session) {
         judg_levels[2] = max(workers$num_judgments)
       }
       
-      print("J levels")
-      print(judg_levels)
       sliderInput(inputId = "num_judgs",
                   label = "Number of Judgments",
                   min = judg_levels[1] - 1, max = judg_levels[2] + 1, 
@@ -393,14 +442,8 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       full_file_with_times = full_file()
-      print("In scambot selector about to print a column")
-      print(head(full_file_with_times$time_duration_log))
-      print("Printing min time")
       min_time = min(full_file_with_times$time_duration_log,na.rm=T) - 0.1
-      print(min_time)
-      print("Printing max time")
       max_time = max(full_file_with_times$time_duration_log,na.rm=T)
-      print(max_time)
       sliderInput("threshold", "Scambot's log-duration threshold:", 
                   min = min_time, max = max_time, value = min_time, step= 0.1)
     }
@@ -596,7 +639,6 @@ shinyServer(function(input, output, session) {
       full_by_worker = distros()
       
       if(input$id_chosen_profiles != ""){
-        print("collecting golds seen")
         worker_profile = full_by_worker[full_by_worker$X_worker_id == input$id_chosen_profiles,]
         golds_total = worker_profile$num_golds
         p(golds_total)
@@ -611,19 +653,12 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       if(input$id_chosen_profiles != ""){
-        print("collecting units seen")
         worker_profile = full_file_contrib_id()
         units_seen = unique(worker_profile$X_unit_id[worker_profile$X_golden != "true"])
         if(length(units_seen) > 100){ 
           units_seen = units_seen[1:100]
-          return(units_seen)
-          
-        } else{
-          return(units_seen)
-        }
-        
-        print(units_seen)
-        print("L503")
+        } 
+        units_seen
       }
     }
   })
@@ -640,6 +675,7 @@ shinyServer(function(input, output, session) {
                   questions)
     }
   })
+  
   ###Select Which Distributions to Look at for Golds 
   output$profileQuestionSelectorGolds <- renderUI({
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0 || input$id_chosen_profiles =="") {
@@ -731,10 +767,8 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       units = profile_units()
-      print("L701")
       html_table = "<table border=1>"
       html_table = paste(html_table, '<tr>', sep='')
-      print(length(units))
       for (i in 1:length(units)){
         value = units[i]
         value_link = paste("https://crowdflower.com/jobs/",
@@ -763,11 +797,8 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       units = profile_golds()
-      #print("L695")
-      #print("L697")
       html_table = "<table border=1>"
       html_table = paste(html_table, '<tr>', sep='')
-      print(length(units))
       for (i in 1:length(units)){
         value = units[i]
         value_link = paste("https://crowdflower.com/jobs/",
@@ -797,15 +828,12 @@ shinyServer(function(input, output, session) {
       workers = agg_by_worker()
       profile = workers[workers$X_worker_id == profile_id,]
       workers = workers[workers$X_worker_id != profile_id,]
-      print(head(profile))
-      print(head(workers))
       match = list()
       match_sum = c()
       match_string = c()
       
       for(i in 1:length(workers$X_worker_id)){     
         match[[i]] = rep(FALSE, times=length(comparisons)) # times needs to be equal to the number of conditions
-        #print("How are we doing")
         
         if(workers$country[i] == profile$country){
           match[[i]][1] = TRUE
@@ -813,7 +841,6 @@ shinyServer(function(input, output, session) {
         
         if(workers$channel[i] == profile$channel){
           match[[i]][2] = TRUE
-          #print("Made it to 589")
         }
         
         if(workers$trust[i] == profile$trust){
@@ -872,53 +899,40 @@ shinyServer(function(input, output, session) {
       full_by_worker = agg_by_worker()
       
       if(input$id_chosen != ""){
-        print("Searching by ID")
         full_by_worker = full_by_worker[full_by_worker$X_worker_id == input$id_chosen,]        
       }
       
       if (input$sortby_chosen != "none"){
         if (input$sortby_chosen == "sortby_trust"){
-          print("Sorting By Trust")
           if (input$ascending != "ascending"){
             full_by_worker = full_by_worker[order(full_by_worker$trust, decreasing = T),]
-            print("trust ascending")
           }
           if (input$ascending == "ascending") {
             full_by_worker = full_by_worker[order(full_by_worker$trust, decreasing = F),]
-            print("trust descending")
           }
         }
         if (input$sortby_chosen == "sortby_judgments"){
-          print("Sorting By Judgments")
           if (input$ascending != "ascending"){
             full_by_worker = full_by_worker[order(full_by_worker$num_judgments, decreasing = T),]
-            print("judgs ascending")
           }
           if (input$ascending == "ascending") {
             full_by_worker = full_by_worker[order(full_by_worker$num_judgments, decreasing = F),]
-            print("judgs descending")
           }
         }
         if (input$sortby_chosen == "sortby_submit"){
-          print("Sorting By Submission")
           if (input$ascending != "ascending"){
             full_by_worker = full_by_worker[order(full_by_worker$last_submit, decreasing = T),]
-            print("times ascending")
           }
           if (input$ascending == "ascending") {
             full_by_worker = full_by_worker[order(full_by_worker$last_submit, decreasing = F),]
-            print("times descending")
           }
         }
         if (input$sortby_chosen == "sortby_ips"){
-          print("Sorting By Ips")
           if (input$ascending != "ascending"){
             full_by_worker = full_by_worker[order(full_by_worker$num_ips, decreasing = T),]
-            print("ip descending")
           }
           if (input$ascending == "ascending") {
             full_by_worker = full_by_worker[order(full_by_worker$num_ips, decreasing = F),]
-            print("ip ascending")
           }
         }
       }
@@ -936,17 +950,14 @@ shinyServer(function(input, output, session) {
       worker_ips = agg_by_ip()
       
       if (input$country_chosen != "all_countries") {
-        print("Subsetting by country")
         worker_ips = worker_ips[worker_ips$country_ip == input$country_chosen,]
       }
       if (input$channel_chosen != "all_channels") {
-        print("Subsetting by country")
         worker_ips = worker_ips[worker_ips$channel_ip == input$channel_chosen,]
       }
       
       if(input$time_chosen != "none"){
         current_time = as.POSIXlt(Sys.time(), "GMT")
-        print(current_time)
         if(input$time_chosen == "thirty_mins"){
           #subtracting 30 mins from current time
           time = current_time - 1800
@@ -976,67 +987,52 @@ shinyServer(function(input, output, session) {
       }
       
       if (!is.null(input$num_judgs)) {
-        print("Subsetting by judgments")
         worker_ips = worker_ips[worker_ips$num_judgments_ip <= max(input$num_judgs) &
                                   worker_ips$num_judgments_ip >= min(input$num_judgs),]   
       }
       
       if (!is.null(input$trust_chosen)) {
-        print("Subsetting by trust")
         worker_ips = worker_ips[worker_ips$trust_ip <= max(input$trust_chosen) &
                                   worker_ips$trust >= min(input$trust_chosen),]
       }
       
       if (input$sortby_chosen_ip != "none_ip"){
         if (input$sortby_chosen_ip == "sortby_trust_ip"){
-          print("Sorting By Trust")
           if (input$ascending_ip != "ascending_ip"){
             worker_ips = worker_ips[order(worker_ips$trust_ip, decreasing = T),]
-            print("trust ascending")
           }
           if (input$ascending_ip == "ascending_ip") {
             worker_ips = worker_ips[order(worker_ips$trust_ip, decreasing = F),]
-            print("trust descending")
           }
         }
         if (input$sortby_chosen_ip == "sortby_judgments_ip"){
-          print("Sorting By Judgments")
           if (input$ascending != "ascending_ip"){
             worker_ips = worker_ips[order(worker_ips$num_judgments_ip, decreasing = T),]
-            print("judgs ascending")
           }
           if (input$ascending_ip == "ascending_ip") {
             worker_ips = worker_ips[order(worker_ips$num_judgments_ip, decreasing = F),]
-            print("judgs descending")
           }
         }
         if (input$sortby_chosen_ip == "sortby_submit_ip"){
-          print("Sorting By Submission")
           if (input$ascending_ip != "ascending_ip"){
             worker_ips = worker_ips[order(worker_ips$last_submit_ip, decreasing = T),]
-            print("times ascending")
           }
           if (input$ascending_ip == "ascending_ip") {
             worker_ips = worker_ips[order(worker_ips$last_submit_ip, decreasing = F),]
-            print("times descending")
           }
         }
         if (input$sortby_chosen_ip == "sortby_ids"){
-          print("Sorting By Ips")
           if (input$ascending_ip != "ascending_ip"){
             worker_ips = worker_ips[order(worker_ips$num_work_ids, decreasing = T),]
-            print("id descending")
           }
           if (input$ascending == "ascending_ip") {
             worker_ips = worker_ips[order(worker_ips$num_work_ids, decreasing = F),]
-            print("id ascending")
           }
         }
         
         
       }
       if(input$ip_chosen != ""){
-        print("Searching by ID")
         worker_ips = worker_ips[worker_ips$X_ip == input$ip_chosen,]        
       }  
       
@@ -1086,11 +1082,9 @@ shinyServer(function(input, output, session) {
       # User has not uploaded a file yet
       return(NULL)
     } else { 
-      # print('Starting the Plot Workers Chart')
       workers = get_worker_table()
-      # print(paste("Input chosen",input$group_chosen))
+     
       if(input$group_chosen != "trust"){
-        # print(names(workers))
         p6 <- nPlot(num_judgments ~ X_worker_id, group=input$group_chosen, data = workers, type='multiBarChart', 
                     dom='plot_workers', width=800)
         p6$xAxis(rotateLabels=45)
@@ -1102,10 +1096,7 @@ shinyServer(function(input, output, session) {
         if (sum(duplicated(this_fiver))>0) {
           this_fiver = unique(this_fiver)
         }
-        #  print("Printing fiver from which_bucket")
-        #  print(this_fiver)
-        #  print("Head of trust scores for which_bucket")
-        #  print(head(workers$trust))
+
         workers$trust_buckets = sapply(workers$trust,
                                        function(k) which_bucket(y=k,
                                                                 fiver=this_fiver))
@@ -1149,8 +1140,7 @@ shinyServer(function(input, output, session) {
       responses = lapply(answer_cols_names, function(x) {
         responses = table(full_file[,names(full_file)==x])
         responses/sum(responses)
-      }
-      )
+      })
       
       responses_table = responses[[question_index]]
       
@@ -1183,9 +1173,6 @@ shinyServer(function(input, output, session) {
   ###Individual Contributor Unit Distributions
   output$profile_units_distros <- renderChart({
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
-      # User has not uploaded a file yet
-      #return(NULL)
-      
       return(NULL)
     } else {
       
@@ -1219,27 +1206,25 @@ shinyServer(function(input, output, session) {
         
         individual = as.data.frame(responses[[question_index]])
         all = as.data.frame(responses_all[[question_index]])
-        View(individual)
-        View(all)
+       
         
         missing_var1 = all$Var1[!(all$Var1 %in% individual$Var1)]
         if (length(missing_var1) != 0){
           missing_rows = data.frame(Var1 = missing_var1, Freq = 0 )
           individual = rbind(individual, missing_rows)
         }
-        #View(individual)
-        #View(all)
+        
        
         responses_table_bind = rbind(individual, all)
         group_var = c(rep("individual", times=nrow(individual)),
                       rep("all", times=nrow(all)))
         responses_table_bind$group_var = group_var
-        View(responses_table_bind)
+        
         
         responses_table_transformed = data.frame(questions = as.character(responses_table_bind$Var1), 
                                                  numbers = as.numeric(responses_table_bind$Freq),
                                                  group = responses_table_bind$group_var)
-        View(responses_table_transformed)
+
         
         #responses_table_transformed = responses_table_transformed[1:3]
         #          if (nrow(responses_table_transformed) > 9 ) {
@@ -1267,7 +1252,6 @@ shinyServer(function(input, output, session) {
   
   ###Individual Contributor Gold Distributions
   output$profile_golds_distros <- renderChart({
-    #full_file_unit_answers <- reactive(function(){
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
       # User has not uploaded a file yet
       return(NULL)
@@ -1310,8 +1294,8 @@ shinyServer(function(input, output, session) {
                     rep("all", times=nrow(all)))
       responses_table_bind$group_var = group_var
       
-   #   responses_table_transformed = data.frame(questions = rep(colnames(responses_table_bind), 
-   #                                                            each=nrow(responses_table_bind)),
+  #   responses_table_transformed = data.frame(questions = rep(colnames(responses_table_bind), 
+  #                                                            each=nrow(responses_table_bind)),
   #                                             numbers = as.numeric(responses_table_bind),
   #                                             group = rep(row.names(responses_table_bind), 
   #                                                         rep=ncol(responses_table_bind)))
@@ -1402,9 +1386,7 @@ shinyServer(function(input, output, session) {
       return(NULL)
     } else {
       df=subsetted_file()
-      print("not broken")
       threshold = input$threshold
-      print("Defined threshold, about to subset in Burminator")
       df_under=df[which(df$time_duration_log<threshold),c("X_worker_id","X_ip", "time_duration")]
       if (nrow(df_under)==0) {
         return(df_under)
@@ -1434,6 +1416,30 @@ shinyServer(function(input, output, session) {
     }
   })
   
+  output$actionSelector <- renderUI({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+     checkboxInput(inputId="flag_chosen", label="Flag Workers", FALSE)
+    }
+  })
+  
+  output$dowloadSelector <- renderUI({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      action = input$flag_chosen
+      
+      if(action == FALSE){
+        button_label = "Reject ALL workers below"
+      } else{
+        button_label = "Flag ALL workers below"
+      }
+      downloadButton('downloadData', button_label)
+    }
+  })
   
   output$plot <- renderPlot({
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
@@ -1457,7 +1463,6 @@ shinyServer(function(input, output, session) {
   output$offenders <- renderText({
     df=offenders_table()
     if (nrow(df) > 0) {
-      print("probs about to break")
       thou_dost_offend_me = ddply(df, .(X_worker_id), summarize,
                                   ip = X_ip[1],
                                   location = paste(X_city[1], X_country[1], sep=", "),
@@ -1486,7 +1491,11 @@ shinyServer(function(input, output, session) {
             html_offenders = paste(html_offenders, '</td>', sep="\n")
           }
           html_offenders = paste(html_offenders, '<td>', sep="\n")
-          html_offenders = paste(html_offenders, 'Reject!', sep="\n")
+          if(input$flag_chosen == FALSE){
+            html_offenders = paste(html_offenders, 'Reject!', sep="\n")
+          } else{
+            html_offenders = paste(html_offenders, 'Flag!', sep="\n")  
+          }
           html_offenders = paste(html_offenders, '</td>', sep="\n")
         } else {
           for (value_id in 1:length(this_row)) {
@@ -1511,7 +1520,13 @@ shinyServer(function(input, output, session) {
             html_offenders = paste(html_offenders, '</td>', sep="\n")
           }
           html_offenders = paste(html_offenders, '<td>', sep="\n")
-          html_offenders = paste(html_offenders, '<button class="btn btn-danger action-button shiny-bound-input" data-toggle="button" id="get', this_row[1], '" type="button">Reject</button>' , sep="")
+          if(input$flag_chosen == FALSE){
+          html_offenders = 
+            paste(html_offenders, '<button class="btn btn-danger action-button shiny-bound-input" data-toggle="button" id="get', this_row[1], '" type="button">Reject</button>' , sep="")
+          } else{
+            html_offenders = 
+              paste(html_offenders, '<button class="btn btn-warning action-button shiny-bound-input" data-toggle="button" id="get', this_row[1], '" type="button">Flag</button>' , sep="")
+          }
           html_offenders = paste(html_offenders, '</td>', sep="\n")
         }
         
@@ -1535,9 +1550,7 @@ shinyServer(function(input, output, session) {
         return(NULL)
       } else {
         potential_offenders = unique(df$X_worker_id)
-        print(potential_offenders)
         potential_gets = paste("get", potential_offenders, sep="")
-        print(potential_gets)
         ids_to_reject = c()
         for (i in 1:length(potential_gets)) {
           if(input[[potential_gets[i]]] == 0) {
@@ -1554,8 +1567,13 @@ shinyServer(function(input, output, session) {
   })
   
   output$flag_some_workers <- renderText({
+    action = input$flag_chosen
     ids_to_reject = flag_individual_workers()
-    lapply(ids_to_reject, function(x) reject_user(job_id = job_id(), x=x))
+    if(action == FALSE){
+     lapply(ids_to_reject, function(x) reject_user(job_id = job_id(), x=x))
+    } else{
+     lapply(ids_to_reject, function(x) flag_user(job_id = job_id(), x=x))  
+    }
     paste("")
   })
   
@@ -1566,8 +1584,13 @@ shinyServer(function(input, output, session) {
       if (nrow(df) == 0) {
         return(NULL)
       } else {
+        action = input$flag_chosen
         ids_to_reject = unique(df$X_worker_id)
-        lapply(ids_to_reject, function(x) reject_user(job_id = job_id(), x=x))
+        if(action == FALSE){
+          lapply(ids_to_reject, function(x) reject_user(job_id = job_id(), x=x))
+        } else{
+          lapply(ids_to_reject, function(x) flag_user(job_id = job_id(), x=x))
+        }
       }
       write.csv(df, paste(file,sep=''), row.names=F, na="")
     }
