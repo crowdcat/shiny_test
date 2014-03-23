@@ -1,7 +1,5 @@
 ###contributors
-###outstanding: comparison graphs, broaden last submit options
-###more contrib grouping options, DB pulls.
-### Last updated 02/25/2014
+### Last updated 03/21/2014
 
 require('shiny')
 require('datasets')
@@ -71,7 +69,7 @@ shinyServer(function(input, output, session) {
     return(full_file)
   })
   
-  # add new columnds to full file like assignment durection and last submission
+  # add new columns to full file like assignment duration and last submission
   full_file <- reactive({
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
       # User has not uploaded a file yet
@@ -597,71 +595,173 @@ shinyServer(function(input, output, session) {
     
   })
   
-  ###Show which golds they worked on
-  profile_golds <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
-      # User has not uploaded a file yet
-      return(NULL)
-    } else {
-      full_by_worker = distros()
-      
-      if(input$id_chosen_profiles != ""){
-        worker_profile = full_file_contrib_id()
-        golds_seen = unique(worker_profile$X_unit_id[worker_profile$X_golden == "true"])
-        if(length(golds_seen ) > 100){
-          golds_seen = golds_seen[1:100]
-          return(golds_seen)
-        } else{
-          return(golds_seen)
-        }
-      }
-    }
-  })    
   
-  ##Gold Distros
-  output$goldAnswers <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
-      # User has not uploaded a file yet
-      return(NULL)
-    } else {
-      gold_answers = full_file_gold_answers()
-      p(gold_answers)
-      
-    }
-  })
-  
-  ###Give total golds worked on
-  output$profileGoldCount <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
-      # User has not uploaded a file yet
-      return(NULL)
-    } else {
-      full_by_worker = distros()
-      
-      if(input$id_chosen_profiles != ""){
-        worker_profile = full_by_worker[full_by_worker$X_worker_id == input$id_chosen_profiles,]
-        golds_total = worker_profile$num_golds
-        p(golds_total)
-      }
-    }
-  })
-  
-  ###Show which units they worked on
+###Show units worked on
   profile_units <- reactive({
     if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
       if(input$id_chosen_profiles != ""){
+        all_profile = full_file()
         worker_profile = full_file_contrib_id()
-        units_seen = unique(worker_profile$X_unit_id[worker_profile$X_golden != "true"])
-        if(length(units_seen) > 100){ 
-          units_seen = units_seen[1:100]
-        } 
-        units_seen
+        answer_columns = full_file_gold_answers()
+        answer_columns = gsub(answer_columns, pattern="(_gold)", replacement="") 
+        
+        ###Grab unit work for profiles 
+        worker_answers = worker_profile[,c("X_unit_id", answer_columns)]
+        
+        ###Grab a rand subset
+        
+        if(nrow(worker_answers) > 10){
+          worker_answers = worker_answers[sample(1:nrow(worker_answers), 10, replace=FALSE),]
+        }
+        
+        worker_answers
       }
     }
   })
+  
+output$html_unit_table <- renderText({
+  if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    # User has not uploaded a file yet
+    return(NULL)
+  } else {
+    if(input$id_chosen_profiles != ""){
+    worker_table = profile_units()
+    job_id = job_id()
+    html_table = "<table border=1>"
+    worker_table = rbind(names(worker_table),
+                         worker_table)
+    for (i in 1:nrow(worker_table)) {
+      this_row = worker_table[i,]
+      html_table = paste(html_table, '<tr>', sep="\n")
+      if (i == 1) {
+        for (value in this_row) {
+          html_table = paste(html_table, '<td>', sep="\n")
+          html_table = paste(html_table,
+                             paste("<b>",value, "</b>"),
+                             sep="\n") # pastes value!
+          html_table = paste(html_table, '</td>', sep="\n")
+        }
+      } else {
+        for (value_id in 1:length(this_row)) {
+          value = this_row[value_id]
+          html_table = paste(html_table, '<td>', sep="\n")
+          if (value_id == 1) {
+            value_link = 
+              paste("https://crowdflower.com/jobs/", job_id, "/units/", value,sep="")
+            value_to_paste= 
+              paste("<a href=\"", value_link, "\" target=\"_blank\">", value, "</a>")
+            html_table = paste(html_table, value_to_paste, sep="\n") # pastes value!
+          } else {
+            html_table = paste(html_table, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
+          }
+          html_table = paste(html_table, '</td>', sep="\n")
+        }
+      }
+      html_table = paste(html_table, '</tr>', sep="\n")
+    }
+    html_table = paste(html_table,"</table>", sep="\n")
+    return(html_table)
+    }
+  }
+})
+  
+
+###Give total golds worked on
+output$profileGoldCount <- renderUI({
+  if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    # User has not uploaded a file yet
+    return(NULL)
+  } else {
+    full_by_worker = distros()
+    
+    if(input$id_chosen_profiles != ""){
+      worker_profile = full_by_worker[full_by_worker$X_worker_id == input$id_chosen_profiles,]
+      golds_total = worker_profile$num_golds
+      p(golds_total)
+    }
+  }
+})
+
+profile_golds <- reactive({
+  if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    # User has not uploaded a file yet
+    return(NULL)
+  } else {
+    if(input$id_chosen_profiles != ""){
+      #all_profile = full_file()
+      worker_profile = full_file_contrib_id()
+      gold_columns = full_file_gold_answers()
+      answer_columns = gsub(gold_columns, pattern="(_gold)", replacement="") 
+      
+      columns = c(gold_columns, answer_columns)
+      columns = columns[order(columns)]
+      
+      ###Grab unit work for profiles 
+      worker_answers = worker_profile[,c("X_unit_id", columns)]
+      
+      ###Grab a rand subset
+      
+      if(nrow(worker_answers) > 10){
+        worker_answers = worker_answers[sample(1:nrow(worker_answers), 10, replace=FALSE),]
+      }
+  
+      worker_answers
+    }
+  }
+})
+
+output$html_gold_table <- renderText({
+  if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    # User has not uploaded a file yet
+    return(NULL)
+  } else {
+    if(input$id_chosen_profiles != ""){
+      worker_table = profile_golds()
+      job_id = job_id()
+      html_table = "<table border=1>"
+      worker_table = rbind(names(worker_table),
+                           worker_table)
+      for (i in 1:nrow(worker_table)) {
+        this_row = worker_table[i,]
+        html_table = paste(html_table, '<tr>', sep="\n")
+        if (i == 1) {
+          for (value in this_row) {
+            html_table = paste(html_table, '<td>', sep="\n")
+            html_table = paste(html_table,
+                             paste("<b>",value, "</b>"),
+                             sep="\n") # pastes value!
+            html_table = paste(html_table, '</td>', sep="\n")
+          }
+        } else {
+          for (value_id in 1:length(this_row)) {
+            value = this_row[value_id]
+            if (is.na(value)){
+              value = ""
+            }
+            html_table = paste(html_table, '<td>', sep="\n")
+            if (value_id == 1) {
+              value_link = 
+                paste("https://crowdflower.com/jobs/", job_id, "/units/", value, sep="")
+              value_to_paste= 
+                paste("<a href=\"", value_link, "\" target=\"_blank\">", value, "</a>")
+              html_table = paste(html_table, value_to_paste, sep="\n") # pastes value!
+            } else {
+              html_table = paste(html_table, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
+            }
+            html_table = paste(html_table, '</td>', sep="\n")
+          }
+        }
+        html_table = paste(html_table, '</tr>', sep="\n")
+      }
+    html_table = paste(html_table,"</table>", sep="\n")
+    return(html_table)
+    }
+  }
+})
+  
   
   ###Select Which Distributions To look at
   output$profileQuestionSelector <- renderUI({
@@ -759,35 +859,7 @@ shinyServer(function(input, output, session) {
     }
   })
   
-  ##Create Clickable links to units on the profile page, under units seen.
-  output$create_unit_links <- renderText({
-    job_id = job_id()
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0 || input$id_chosen_profiles=="") {
-      # User has not uploaded a file yet
-      return(NULL)
-    } else {
-      units = profile_units()
-      html_table = "<table border=1>"
-      html_table = paste(html_table, '<tr>', sep='')
-      for (i in 1:length(units)){
-        value = units[i]
-        value_link = paste("https://crowdflower.com/jobs/",
-                           job_id,
-                           "/units/",
-                           value, sep="")
-        value_to_paste= paste("<a href=\"",
-                              value_link,
-                              "\" target=\"_blank\">",
-                              value,
-                              "</a>")
-        html_table = paste(html_table, value_to_paste, sep="|")
-      }       
-      
-      html_table= paste(html_table, '</tr>', sep="\n")
-      html_table= paste(html_table, "</table>", sep="\n")
-      paste(html_table)
-    }
-  })
+
   
   ###Create Clickable links for golds on profile page. 
   output$create_gold_links <- renderText({
