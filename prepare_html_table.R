@@ -4,7 +4,7 @@ prepare_html_table <- function(worker_table, job_id){
     worker_table = worker_table[1:max_count,]
   }
   
-  html_table = "<table border=1>"
+  html_table = "<table class=\"table table-bordered table-striped\">"
   worker_table$last_submit = as.character(worker_table$last_submit)
   worker_table = rbind(names(worker_table),
                        worker_table)

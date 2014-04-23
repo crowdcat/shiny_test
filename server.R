@@ -8,10 +8,12 @@ require('plyr')
 require('rCharts')
 require('ggplot2')
 require('devtools')
+require('rworldmap')
 
 options(stringsAsFactors=F)
+options(scipen=999)
 #increase max to 150 MB
-options(shiny.maxRequestSize=1000*1024^2)
+options(shiny.maxRequestSize=150*1024^2)
 
 source('add.times.R')
 source('trust_buckets.R')
@@ -39,7 +41,7 @@ shinyServer(function(input, output, session) {
   ### read in file 
   full_file_raw <- reactive({
     
-    if (is.null(input$files) && input$job_id==0) {
+    if ((is.null(input$files)) && input$get_file==0) {
       # User has not uploaded a file yet
       return(NULL)
     } else if (input$job_id > 0) {
@@ -71,7 +73,7 @@ shinyServer(function(input, output, session) {
   
   # add new columns to full file like assignment duration and last submission
   full_file <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if((is.null(input$files)) && input$get_file==0){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -97,15 +99,15 @@ shinyServer(function(input, output, session) {
                         num_judgments = length(X_worker_id))
       
       full_file = add.times(full_file)
-      print("Line 101 print full file with times")
-      print(head(full_file))
+     # print("Line 101 print full file with times")
+    #  print(head(full_file))
       return(full_file)
     }
   })
   
   # this function subsets full_file by left bar controls (Selector for left panel!)
   subsetted_file <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0 || input$job_id==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {    
@@ -165,68 +167,121 @@ shinyServer(function(input, output, session) {
   })
   
   output$summary_stats_country <- renderTable({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      workers = agg_by_worker()
-      total = nrow(workers)
-      num_countries = table(workers$country)
-      num_countries = as.data.frame(num_countries)
-      for(i in 1:nrow(num_countries)){
-        num_countries$percent[i] =
-          num_countries$Freq[i]/total
-        num_countries
+      full_file = full_file()
+      
+      countries = ddply(full_file, .(X_country), summarize,
+                        num_judgments = length(X_unit_id),
+                        num_workers = length(unique(X_worker_id)))
+      
+      countries = countries[order(countries$num_judgments, decreasing=T),]
+      if(nrow(countries) > 10){
+        max_count = min(10, nrow(countries))
+        countries = countries[1:max_count,]
       }
-      num_countries = num_countries[order(num_countries$Freq, decreasing=T),]
-      if(nrow(num_countries) > 10){
-        max_count = min(10, nrow(num_countries))
-        num_countries = num_countries[1:max_count,]
-      }
-      num_countries
+      countries
     }
   })
   
-  output$summary_stats_channel <- renderTable({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+  output$worldGraph <- renderPlot({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      workers = agg_by_worker()
-      total = nrow(workers)
-      num_channels = table(workers$channel)
-      num_channels = as.data.frame(num_channels)
-      for(i in 1:nrow(num_channels)){
-        num_channels$percent[i] =
-          num_channels$Freq[i]/total
-        num_channels
+      full_file = full_file()
+      
+      countries = ddply(full_file, .(X_country), summarize,
+                        num_judgments = length(X_unit_id))
+      
+      plot_data <- joinCountryData2Map(countries 
+                                       , joinCode = "ISO3" 
+                                       , nameJoinColumn = "X_country")
+      
+      map = mapCountryData( plot_data, nameColumnToPlot="num_judgments", 
+                            catMethod="categorical", colourPalette="heat", addLegend='FALSE',
+                            oceanCol = "#99CCFF", borderCol="black")
+      
+      #map = map + addMapLegend(legendLabels="none")
+      print(map)
+    
+    } 
+  })
+  
+  output$summary_stats_channel <- renderTable({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      full_file = full_file()
+      
+      channels = ddply(full_file, .(X_channel), summarize,
+                        num_judgments = length(X_unit_id),
+                        num_workers = length(unique(X_worker_id)))
+      
+      channels = channels[order(channels$num_judgments, decreasing=T),]
+      if(nrow(channels) > 10){
+        max_count = min(10, nrow(channels))
+        channels = channels[1:max_count,]
       }
-      num_channels = num_channels[order(num_channels$Freq, decreasing=T),]
-      if(nrow(num_channels) > 10){
-        max_count = min(10, nrow(num_channels))
-        num_channels = num_channels[1:max_count,]
+      channels
+    }
+  })
+  
+  output$stackedGraph <- renderPlot({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      
+      full_file = full_file()
+      
+      channels = ddply(full_file, .(X_channel), summarize,
+                       num_judgments = length(X_unit_id),
+                       num_workers = length(unique(X_worker_id)))
+      
+      channels = channels[order(channels$num_judgments, decreasing=T),]
+      
+      if(nrow(channels) > 10){
+        max_count = min(10, nrow(channels))
+        channels = channels[1:max_count,]
       }
-      num_channels
+      
+      custom_palette = c("#CCCCFF", "#99CCFF",
+                         "#3399FF", "#6699CC",
+                         "#3366CC", "#0000FF", 
+                         "#0000CC", "#000099", 
+                         "#000066", "#000033")
+                         
+      
+      h = ggplot(data=channels, aes(x=factor(1), y=num_judgments, fill = factor(X_channel))) 
+      h = h + geom_bar(stat="identity") + scale_fill_manual(values=custom_palette, name="Channels") 
+      h = h + theme_bw() + opts(axis.text.x=element_blank(), axis.title.x=element_blank(),
+                                axis.text.y=element_blank(), axis.title.y=element_blank(),
+                                axis.ticks=element_blank(), legend.position="bottom")
+      print(h)
     }
   })
   
   output$summary_times <- renderText({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
       times_file = full_file()
       max_time = max(times_file$time_duration)
       #max_time
-      print("line 222")
-      print(max_time)
+     # print("line 222")
+    #  print(max_time)
       
       min_time = min(times_file$time_duration)
-      print(min_time)
+     # print(min_time)
       #min_time
       
       avg_time = mean(times_file$time_duration)
-      print(avg_time)
+      #print(avg_time)
       
       min_m = paste("Minimum completion time: ", min_time, sep="")
       max_m = paste("Maximum completion time: ", max_time, sep="")
@@ -238,7 +293,7 @@ shinyServer(function(input, output, session) {
   
   ##Get Job ID from name of input file
   job_id <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else if (input$job_id > 0) {
@@ -253,11 +308,12 @@ shinyServer(function(input, output, session) {
   
   ### this function gets a single row for every worker to display in contributor table by id
   agg_by_worker <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
       full_file = subsetted_file()
+     
       agg_by_worker = ddply(full_file, .(X_worker_id), summarize,
                             channel = X_channel[1],
                             country = X_country[1],
@@ -266,14 +322,17 @@ shinyServer(function(input, output, session) {
                             trust = X_trust[1],
                             untrusted = X_tainted[1],
                             last_submit = last_submit[1],
-                            num_judgments = num_judgments[1])
+                            num_judgments = num_judgments[1],
+                            min_time = round(min(time_duration), digits=3),
+                            mean_time = round(mean(time_duration), digits=3),
+                            max_time = round(max(time_duration), digits=3))
       agg_by_worker
     }
   })
   
   # matches the functionality of agg_by_worker; note that the actual subsetting is done later
   agg_by_ip <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -296,7 +355,7 @@ shinyServer(function(input, output, session) {
   
   # obtains the slice of the data frame that refers to a particular id
   full_file_contrib_id <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0 || input$id_chosen_profiles=="") {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -312,7 +371,7 @@ shinyServer(function(input, output, session) {
   
   ###Used to record golds and units worked on, as well as contributor location info
   distros <-reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0){
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       return(NULL)
     } else{
       full_file_distros = full_file()
@@ -331,16 +390,30 @@ shinyServer(function(input, output, session) {
   })
   
   ### To Collect Gold Cols and Answers
-  # grabs names of gold columns, removes "_gold" and returns question names
+  # grabs names of gold columns
   full_file_gold_answers <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
       full_file = subsetted_file()
-      gold_cols = grepl(".\\gold$", names(full_file)) & !grepl(".\\golden",names(full_file))
+      gold_cols = grepl(".(_gold)$", names(full_file)) & !grepl(".(golden)$",names(full_file))
       gold_cols_names = names(full_file)[gold_cols]    
       gold_cols_names
+    }
+    
+  })
+  
+  #grab name of answer columns wrt present gold columns
+  full_file_answers <- reactive({
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
+      # User has not uploaded a file yet
+      return(NULL)
+    } else {
+      full_file = subsetted_file()
+      gold_cols = full_file_gold_answers()
+      answer_cols = gsub(gold_cols, pattern="(_gold)", replacement="")
+      answer_cols = names(full_file[names(full_file) %in% answer_cols]) 
     }
     
   })
@@ -348,7 +421,7 @@ shinyServer(function(input, output, session) {
   #### Selector for left panel! #### 
   ##SIDEBAR PANEL###
   output$trustSelector <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -363,7 +436,7 @@ shinyServer(function(input, output, session) {
   
   
   output$countrySelector <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -376,7 +449,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$channelSelector <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -389,7 +462,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$timeSelector <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -406,7 +479,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$judgSelector <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -426,16 +499,23 @@ shinyServer(function(input, output, session) {
         judg_levels[2] = max(workers$num_judgments)
       }
       
+      step_index = 10
+      
+      if((judg_levels[2] - judg_levels[1]) < 10){
+        step_index = 1
+      }
+      
       sliderInput(inputId = "num_judgs",
                   label = "Number of Judgments",
                   min = judg_levels[1] - 1, max = judg_levels[2] + 1, 
-                  step = 10, value = c(judg_levels[1] - 1, judg_levels[2] + 1)) 
+                  step = step_index, value = c(judg_levels[1] - 1, judg_levels[2] + 1))
+      
     }
   })
   
   
   output$scambotSelector <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -452,7 +532,7 @@ shinyServer(function(input, output, session) {
   ###Contributor ID Table  
   
   output$titleTextContributors <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -464,7 +544,7 @@ shinyServer(function(input, output, session) {
         max_count = min(50, nrow(new_workers_trust))
         new_workers_trust = 50
       }
-      puts <- c("Displaying", new_workers_trust, "out of", total_workers_trust, "workers")
+      puts = paste("Displaying", new_workers_trust, "out of", total_workers_trust, "workers", sep=" ")
       h4(puts)
     }
   })
@@ -472,7 +552,7 @@ shinyServer(function(input, output, session) {
   
   ### Worker Graph 
   output$titleTextGraph <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -481,21 +561,21 @@ shinyServer(function(input, output, session) {
       
       if (input$num_chosen == 'fiddy'){
         num_shown = min(total_workers_trust, 50)
-        puts <- c("Graph showing",num_shown, "out of", total_workers_trust, "workers")
+        puts = paste("Graph showing",num_shown, "out of", total_workers_trust, "workers", sep=" ")
       }
       if (input$num_chosen == 'hund'){
         num_shown = min(total_workers_trust, 100)
-        puts <- c("Graph showing",num_shown, "out of", total_workers_trust, "workers")
+        puts = paste("Graph showing",num_shown, "out of", total_workers_trust, "workers", sep=" ")
       }
       if (input$num_chosen == 'all' || total_workers_trust > 50){
-        puts <- c("Graph showing", total_workers_trust, "total workers")
+        puts = paste("Graph showing", total_workers_trust, "total workers", sep=" ")
       }
       h4(puts)
     }
   })
   
   output$titleTextIp <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -507,7 +587,7 @@ shinyServer(function(input, output, session) {
       }
       worker_by_ip = agg_by_ip()
       total_ips = length(worker_by_ip$trust)
-      puts <- c("Displaying", new_total_ips, "out of", total_ips, "IPs")
+      puts = paste("Displaying", new_total_ips, "out of", total_ips, "IPs", sep=" ")
       h4(puts)
       
     }
@@ -516,19 +596,18 @@ shinyServer(function(input, output, session) {
   ### Answer Distros
   
   output$questionSelector <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      questions = full_file_gold_answers()
-      questions = gsub(questions, pattern=".\\gold", replacement="")
+      questions = full_file_answers()
       selectInput(inputId="question_chosen", label="Select question to display:", 
                   questions)
     }
   })
   
   output$titleDistrosUnits <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -553,7 +632,7 @@ shinyServer(function(input, output, session) {
   })
   
   output$titleDistrosJudgs <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -580,7 +659,7 @@ shinyServer(function(input, output, session) {
   ###Individual Contributor Profile Page
   ###Give total units worked on
   output$profileUnitCount <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -598,23 +677,23 @@ shinyServer(function(input, output, session) {
   
 ###Show units worked on
   profile_units <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
       if(input$id_chosen_profiles != ""){
-        all_profile = full_file()
+        #all_profile = full_file()
         worker_profile = full_file_contrib_id()
-        answer_columns = full_file_gold_answers()
-        answer_columns = gsub(answer_columns, pattern="(_gold)", replacement="") 
+        worker_profile = worker_profile[worker_profile$X_golden != 'true',]
+        answer_columns = full_file_answers()
         
         ###Grab unit work for profiles 
         worker_answers = worker_profile[,c("X_unit_id", answer_columns)]
         
         ###Grab a rand subset
         
-        if(nrow(worker_answers) > 10){
-          worker_answers = worker_answers[sample(1:nrow(worker_answers), 10, replace=FALSE),]
+        if(nrow(worker_answers) > 15 && input$all_units_chosen == F){
+          worker_answers = worker_answers[sample(1:nrow(worker_answers), 15, replace=FALSE),]
         }
         
         worker_answers
@@ -623,14 +702,15 @@ shinyServer(function(input, output, session) {
   })
   
 output$html_unit_table <- renderText({
-  if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+  if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
     # User has not uploaded a file yet
     return(NULL)
   } else {
     if(input$id_chosen_profiles != ""){
     worker_table = profile_units()
+    if(length(worker_table$X_unit_id) > 0){
     job_id = job_id()
-    html_table = "<table border=1>"
+    html_table = "<table class=\"table table-bordered table-striped\">"
     worker_table = rbind(names(worker_table),
                          worker_table)
     for (i in 1:nrow(worker_table)) {
@@ -663,6 +743,10 @@ output$html_unit_table <- renderText({
       html_table = paste(html_table, '</tr>', sep="\n")
     }
     html_table = paste(html_table,"</table>", sep="\n")
+    } else {
+      html_table = paste("<div class=\"alert alert-block\"><p>Looks like we were unable to return any unit data. This contributor has probably become untrusted or never entered your job. Make
+                         sure to include tainted judgments if you know this worker was indeed in the job.</p></div>")
+    }
     return(html_table)
     }
   }
@@ -671,7 +755,7 @@ output$html_unit_table <- renderText({
 
 ###Give total golds worked on
 output$profileGoldCount <- renderUI({
-  if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+  if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
     # User has not uploaded a file yet
     return(NULL)
   } else {
@@ -686,26 +770,28 @@ output$profileGoldCount <- renderUI({
 })
 
 profile_golds <- reactive({
-  if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+  if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
     # User has not uploaded a file yet
     return(NULL)
   } else {
     if(input$id_chosen_profiles != ""){
       #all_profile = full_file()
       worker_profile = full_file_contrib_id()
+      worker_profile = worker_profile[worker_profile$X_golden=="true",]
+      #print(head(worker_profile))
       gold_columns = full_file_gold_answers()
-      answer_columns = gsub(gold_columns, pattern="(_gold)", replacement="") 
+      answer_columns = full_file_answers() 
       
       columns = c(gold_columns, answer_columns)
       columns = columns[order(columns)]
       
       ###Grab unit work for profiles 
-      worker_answers = worker_profile[,c("X_unit_id", columns)]
+      worker_answers = worker_profile[,c("X_unit_id", "X_missed", columns)]
       
       ###Grab a rand subset
       
-      if(nrow(worker_answers) > 10){
-        worker_answers = worker_answers[sample(1:nrow(worker_answers), 10, replace=FALSE),]
+      if(nrow(worker_answers) > 15 && input$all_golds_chosen == F){
+        worker_answers = worker_answers[sample(1:nrow(worker_answers), 15, replace=FALSE),]
       }
   
       worker_answers
@@ -714,14 +800,15 @@ profile_golds <- reactive({
 })
 
 output$html_gold_table <- renderText({
-  if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+  if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
     # User has not uploaded a file yet
     return(NULL)
   } else {
     if(input$id_chosen_profiles != ""){
       worker_table = profile_golds()
       job_id = job_id()
-      html_table = "<table border=1>"
+      if(length(worker_table$X_unit_id > 0)){
+      html_table = "<table class=\"table table-bordered table-striped\">"
       worker_table = rbind(names(worker_table),
                            worker_table)
       for (i in 1:nrow(worker_table)) {
@@ -757,6 +844,10 @@ output$html_gold_table <- renderText({
         html_table = paste(html_table, '</tr>', sep="\n")
       }
     html_table = paste(html_table,"</table>", sep="\n")
+    } else {
+      html_table = paste("<div class=\"alert alert-block\"><p>Looks like we were unable to return any gold data. Make
+                         sure to include Golds when generating the full file.</p></div>")
+    }
     return(html_table)
     }
   }
@@ -765,12 +856,11 @@ output$html_gold_table <- renderText({
   
   ###Select Which Distributions To look at
   output$profileQuestionSelector <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0 || input$id_chosen_profiles=="") {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      questions = full_file_gold_answers()
-      questions = gsub(questions, pattern=".\\gold", replacement="")
+      questions = full_file_answers()
       selectInput(inputId="profile_question_chosen", label="Select question to display:",
                   questions)
     }
@@ -778,12 +868,11 @@ output$html_gold_table <- renderText({
   
   ###Select Which Distributions to Look at for Golds 
   output$profileQuestionSelectorGolds <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0 || input$id_chosen_profiles =="") {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
-      questions = full_file_gold_answers()
-      questions = gsub(questions, pattern=".\\gold", replacement="")
+      questions = full_file_answers()
       selectInput(inputId="profile_question_chosen_golds", label="Select question to display:",
                   questions)
     }
@@ -792,7 +881,7 @@ output$html_gold_table <- renderText({
   ###Create Output Tables 
   ##By Contributor ID
   output$create_html_table <- renderText({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -805,16 +894,17 @@ output$html_gold_table <- renderText({
   
   ##By worker IP
   output$create_html_table_ip <- renderText({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
+      job_id = job_id()
       worker_table_ip= live_worker_table_ip()
       if (length(worker_table_ip$channel_ip) > 50){
         max_count = min(50, nrow(worker_table_ip))
         worker_table_ip = worker_table_ip[1:max_count,]
       }
-      html_table = "<table border=1>"
+      html_table = "<table class=\"table table-bordered table-striped\">"
       worker_table_ip$last_submit_ip = as.character(worker_table_ip$last_submit_ip)
       worker_table_ip = rbind(names(worker_table_ip),
                               worker_table_ip)
@@ -824,8 +914,7 @@ output$html_gold_table <- renderText({
         if (i == 1) {
           for (value in this_row) {
             html_table = paste(html_table, '<td>', sep="\n")
-            html_table = paste(html_table,
-                               paste("<b>",value, "</b>"),
+            html_table = paste(html_table, paste("<b>", value, "</b>"),
                                sep="\n") # pastes value!
             html_table = paste(html_table, '</td>', sep="\n")
           }
@@ -833,7 +922,30 @@ output$html_gold_table <- renderText({
           for (value_id in 1:length(this_row)) {
             value = this_row[value_id]
             html_table = paste(html_table, '<td>', sep="\n")
-            html_table = paste(html_table, value, "&nbsp;&nbsp;", sep="\n") # pastes value!
+            if(value_id == 1){
+              value = paste("<a target=\"_blank\" href=\"https://www.google.com/search?q=",value, 
+                            "\">", value, "</a>", sep="")
+              html_table = paste(html_table, value, sep="\n")
+            } 
+             else if(value_id == 4){
+              value = as.character(value)
+              value = str_split(value, '<br>')
+              
+              value = unlist(value)
+              
+              for(j in 1:length(value)){
+                value[j] = paste("<a target=\"_blank\" href=\"https://make.crowdflower.com/jobs/", 
+                                 job_id, 
+                                 "/contributors/", value[j],"\">",
+                                 value[j], "</a>", sep="")
+              }
+              
+               value = paste(value, collapse="<br>")
+               html_table = paste(html_table, value, sep="\n")
+             }
+            else {
+            html_table = paste(html_table, value, "&nbsp;&nbsp;", sep="\n") 
+            }# pastes value!
             html_table = paste(html_table, '</td>', sep="\n")
           }
         }
@@ -847,7 +959,7 @@ output$html_gold_table <- renderText({
   ###Create Single Profile Table of a contributor
   output$create_profile_table <- renderText({
     
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0 || input$id_chosen_profiles == "") {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -855,7 +967,12 @@ output$html_gold_table <- renderText({
       table= agg_by_worker()
       profile_id = input$id_chosen_profiles
       table = table[table$X_worker_id == profile_id,]
-      prepare_html_table(worker_table = table, job_id = job)
+      if(nrow(table) == 0){
+        message = paste("<div class=\"alert alert-danger\"><p>No data found. Are you sure this worker entered the job?</p></div>")
+        message
+      } else {
+        prepare_html_table(worker_table = table, job_id = job)
+      }
     }
   })
   
@@ -863,13 +980,13 @@ output$html_gold_table <- renderText({
   
   ###Create Clickable links for golds on profile page. 
   output$create_gold_links <- renderText({
-    job_id = job_id()
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0 || input$id_chosen_profiles=="") {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
+      job_id = job_id()
       units = profile_golds()
-      html_table = "<table border=1>"
+      html_table = "<table class=\"table table-bordered table-striped\">"
       html_table = paste(html_table, '<tr>', sep='')
       for (i in 1:length(units)){
         value = units[i]
@@ -892,7 +1009,7 @@ output$html_gold_table <- renderText({
   })
   
   profile_similar_workers <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -939,7 +1056,7 @@ output$html_gold_table <- renderText({
   })
   
   output$similarity_legend <- renderText({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -963,7 +1080,7 @@ output$html_gold_table <- renderText({
   
   #### Contributor Table Reacts to Functions Inputs is loaded in create_html_table #### 
   live_worker_table <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {    
@@ -1015,7 +1132,7 @@ output$html_gold_table <- renderText({
   
   ### IP Table Reacts to Same Inputs As Contributor Table loaded into create_html_table_ip 
   live_worker_table_ip <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else { 
@@ -1115,8 +1232,7 @@ output$html_gold_table <- renderText({
   ##Graphs and Plots  
   ##General Plot of contributor table, sortable.
   output$create_similar_table <- renderText({
-    
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1127,7 +1243,7 @@ output$html_gold_table <- renderText({
   })
   
   get_worker_table <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else { 
@@ -1149,8 +1265,7 @@ output$html_gold_table <- renderText({
   })
   
   output$plot_workers <- renderChart({
-    print("Calling the Plot Workers Chart")
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else { 
@@ -1163,7 +1278,7 @@ output$html_gold_table <- renderText({
         p6$chart(reduceXTicks = FALSE)
         p6
       } else{
-        print("Going into fiver in Plot Workers Chart")
+        #print("Going into fiver in Plot Workers Chart")
         this_fiver = fivenum(workers$trust, na.rm=T)
         if (sum(duplicated(this_fiver))>0) {
           this_fiver = unique(this_fiver)
@@ -1185,19 +1300,15 @@ output$html_gold_table <- renderText({
   })
   
   output$plot_distros <- renderChart({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
       full_file = subsetted_file()
-      answer_cols = grepl(pattern=".\\gold$", names(full_file)) &
-        !grepl(pattern=".\\golden",names(full_file))
-      answer_cols_names = names(full_file)[answer_cols]
-      answer_cols_names = gsub(answer_cols_names, pattern=".\\gold", replacement="")
-      # return(answer_cols_names)
+      answer_cols = full_file_answers()
       
       chosen_q = input$question_chosen
-      question_index = which(answer_cols_names == chosen_q)
+      question_index = which(answer_cols == chosen_q)
       
       chosen_state = input$state_chosen
       
@@ -1209,10 +1320,11 @@ output$html_gold_table <- renderText({
         }
       }
       
-      responses = lapply(answer_cols_names, function(x) {
+      responses = lapply(answer_cols, function(x) {
         responses = table(full_file[,names(full_file)==x])
-        responses/sum(responses)
+        responses/sum(responses) * 100
       })
+      
       
       responses_table = responses[[question_index]]
       
@@ -1220,6 +1332,7 @@ output$html_gold_table <- renderText({
                                                numbers = as.numeric(responses_table),
                                                group = chosen_q)
       
+      print(head(responses_table_transformed))
       responses_table_transformed = responses_table_transformed[order(-responses_table_transformed$numbers),]
       
       if (nrow(responses_table_transformed) > 9 ) {
@@ -1244,7 +1357,7 @@ output$html_gold_table <- renderText({
   
   ###Individual Contributor Unit Distributions
   output$profile_units_distros <- renderChart({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
       return(NULL)
     } else {
       
@@ -1253,61 +1366,65 @@ output$html_gold_table <- renderText({
       } else {
         full_file = full_file_contrib_id()
         full_file_all = full_file()
-        answer_cols = grepl(pattern=".\\gold$", names(full_file)) &
-          !grepl(pattern=".\\golden",names(full_file))
-        answer_cols_names = names(full_file)[answer_cols]
-        answer_cols_names = gsub(answer_cols_names, pattern=".\\gold", replacement="")
+        
+        if ("X_golden" %in% names(full_file)) {
+          full_file = full_file[full_file$X_golden != 'true',]
+          full_file_all = full_file_all[full_file_all$X_golden != 'true',]
+        }
+        
+        answer_cols_names = full_file_answers()
         
         profile_chosen_q = input$profile_question_chosen
         question_index = which(answer_cols_names == profile_chosen_q)
         
-        
-        if ("X_golden" %in% names(full_file)) {
-          full_file = full_file[full_file$X_golden != 'true',]
-        }
-        
         responses = lapply(answer_cols_names, function(x) {
           responses = table(full_file[,names(full_file)==x])
-          responses/sum(responses)
+          responses/sum(responses) * 100
         })
         
         responses_all = lapply(answer_cols_names, function(y){
           responses_all = table(full_file_all[,names(full_file_all)==y])
-          responses_all/sum(responses_all)
+          responses_all/sum(responses_all) * 100
         })
         
         individual = as.data.frame(responses[[question_index]])
-        all = as.data.frame(responses_all[[question_index]])
-       
-        
+        all = as.data.frame(responses_all[[question_index]]) 
         missing_var1 = all$Var1[!(all$Var1 %in% individual$Var1)]
+        
         if (length(missing_var1) != 0){
           missing_rows = data.frame(Var1 = missing_var1, Freq = 0 )
           individual = rbind(individual, missing_rows)
         }
         
-       
         responses_table_bind = rbind(individual, all)
         group_var = c(rep("individual", times=nrow(individual)),
                       rep("all", times=nrow(all)))
         responses_table_bind$group_var = group_var
         
-        
         responses_table_transformed = data.frame(questions = as.character(responses_table_bind$Var1), 
                                                  numbers = as.numeric(responses_table_bind$Freq),
                                                  group = responses_table_bind$group_var)
-
-        
-        #responses_table_transformed = responses_table_transformed[1:3]
-        #          if (nrow(responses_table_transformed) > 9 ) {
-        #            responses_table_transformed1 = responses_table_transformed[1:9,]
-        #            responses_table_transformed1[10,] =
-        #              c("Other Values", sum(responses_table_transformed$numbers[10:length(responses_table_transformed)]),
-        #                profile_chosen_q)
-        #            responses_table_transformed = responses_table_transformed1
-        #          }
-        #         
+              
         responses_table_transformed$questions[responses_table_transformed$questions==""] = "\"\""
+        responses_table_transformed = responses_table_transformed[!(is.null(responses_table_transformed$questions)),]
+        
+        if(input$units_order_chosen == FALSE){
+          responses_table_transformed = responses_table_transformed[with(responses_table_transformed,
+                                                                         order(-(as.integer(factor(group))), -(responses_table_transformed$numbers))),]
+        } else {
+          responses_table_transformed = responses_table_transformed[with(responses_table_transformed,
+                                                                         order(as.integer(factor(group)), -(responses_table_transformed$numbers))),]
+        }
+        
+        if(nrow(responses_table_transformed) > 10){
+          responses_table_transformed_1 = responses_table_transformed[responses_table_transformed$group == "all",]
+          responses_table_transformed_1 = responses_table_transformed_1[1:10,]
+          responses_table_transformed_2 = responses_table_transformed[responses_table_transformed$group == "individual",]
+          responses_table_transformed_2 = responses_table_transformed_2[1:10,]
+          responses_table_transformed_3 = rbind(responses_table_transformed_1, responses_table_transformed_2)
+          
+          responses_table_transformed = responses_table_transformed_3
+        }
         
         p2 <- nPlot(numbers ~ questions, data=responses_table_transformed, group = 'group',
                     type='multiBarChart', dom='profile_units_distros') 
@@ -1324,16 +1441,13 @@ output$html_gold_table <- renderText({
   
   ###Individual Contributor Gold Distributions
   output$profile_golds_distros <- renderChart({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0) || (input$id_chosen_profiles == "")) {
       # User has not uploaded a file yet
       return(NULL)
     } else {
       full_file = full_file_contrib_id()
       full_file_all = full_file()
-      answer_cols = grepl(pattern=".\\gold$", names(full_file)) &
-        !grepl(pattern=".\\golden",names(full_file))
-      answer_cols_names = names(full_file)[answer_cols]
-      answer_cols_names = gsub(answer_cols_names, pattern=".\\gold", replacement="")
+      answer_cols_names = full_file_answers()
       
       profile_chosen_q = input$profile_question_chosen_golds
       question_index = which(answer_cols_names == profile_chosen_q)
@@ -1341,16 +1455,17 @@ output$html_gold_table <- renderText({
       
       if ("X_golden" %in% names(full_file)) {
         full_file = full_file[full_file$X_golden == 'true',]
+        full_file_all = full_file_all[full_file_all$X_golden == 'true',]
       }
       
       responses = lapply(answer_cols_names, function(x) {
         responses = table(full_file[,names(full_file)==x])
-        responses/sum(responses)
+        responses/sum(responses) * 100
       })
       
       responses_all = lapply(answer_cols_names, function(y){
         responses_all = table(full_file_all[,names(full_file_all)==y])
-        responses_all/sum(responses_all)
+        responses_all/sum(responses_all) * 100
       })
       
       #individual = responses[[question_index]]
@@ -1358,25 +1473,46 @@ output$html_gold_table <- renderText({
       individual = as.data.frame(responses[[question_index]])
       all = as.data.frame(responses_all[[question_index]])
       missing_var1 = all$Var1[!(all$Var1 %in% individual$Var1)]
-      missing_rows = data.frame(Var1 =missing_var1, Freq = 0 )
-      individual = rbind(individual, missing_rows)
+      
+      if(length(missing_var1) != 0){
+        missing_rows = data.frame(Var1 =missing_var1, Freq = 0 )
+        individual = rbind(individual, missing_rows)
+      }
       
       responses_table_bind = rbind(individual, all)
       group_var = c(rep("individual", times=nrow(individual)),
                     rep("all", times=nrow(all)))
       responses_table_bind$group_var = group_var
       
-  #   responses_table_transformed = data.frame(questions = rep(colnames(responses_table_bind), 
-  #                                                            each=nrow(responses_table_bind)),
-  #                                             numbers = as.numeric(responses_table_bind),
-  #                                             group = rep(row.names(responses_table_bind), 
-  #                                                         rep=ncol(responses_table_bind)))
+ 
       
       responses_table_transformed = data.frame(questions = as.character(responses_table_bind$Var1), 
                                                numbers = as.numeric(responses_table_bind$Freq),
                                                group = responses_table_bind$group_var)
       
       responses_table_transformed$questions[responses_table_transformed$questions==""] = "\"\""
+      responses_table_transformed = responses_table_transformed[!(is.null(responses_table_transformed$questions)),]
+      
+      if(input$golds_order_chosen == FALSE){
+        responses_table_transformed = responses_table_transformed[with(responses_table_transformed,
+                                                                       order(-(as.integer(factor(group))), -(responses_table_transformed$numbers))),]
+      } else {
+        responses_table_transformed = responses_table_transformed[with(responses_table_transformed,
+                                                                       order(as.integer(factor(group)), -(responses_table_transformed$numbers))),]
+      }
+      
+      if(nrow(responses_table_transformed) > 10){
+        responses_table_transformed_1 = responses_table_transformed[responses_table_transformed$group == "all",]
+        responses_table_transformed_1 = responses_table_transformed_1[1:10,]
+        
+        responses_table_transformed_2 = responses_table_transformed[responses_table_transformed$group == "individual",]
+        responses_table_transformed_2 = responses_table_transformed_2[1:10,]
+        
+        responses_table_transformed_3 = rbind(responses_table_transformed_1, responses_table_transformed_2)
+        responses_table_transformed = responses_table_transformed_3
+      } 
+      
+      
       
       p4 <- nPlot(numbers ~ questions, data=responses_table_transformed, group = 'group',
                   type='multiBarChart', dom='profile_golds_distros') 
@@ -1394,7 +1530,7 @@ output$html_gold_table <- renderText({
   
   ############### this part controls displaying the stats ###############
   output$summary_message <- renderText({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return("<p>You have not uploaded any files yet</p>")
     } else {
@@ -1429,7 +1565,7 @@ output$html_gold_table <- renderText({
   ################################ here comes scambot ##########################################
   
   premade_scambot_plot <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1453,7 +1589,7 @@ output$html_gold_table <- renderText({
   })
   
   offenders_table <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1470,7 +1606,7 @@ output$html_gold_table <- renderText({
   })
   
   plot_before_offenders <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1489,7 +1625,7 @@ output$html_gold_table <- renderText({
   })
   
   output$actionSelector <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1498,7 +1634,7 @@ output$html_gold_table <- renderText({
   })
   
   output$dowloadSelector <- renderUI({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1514,7 +1650,7 @@ output$html_gold_table <- renderText({
   })
   
   output$plot <- renderPlot({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1528,6 +1664,7 @@ output$html_gold_table <- renderText({
       if (nrow(offenders) > 0) {
         p = p + geom_point(data = offenders, colour = "darkorange")
       }  
+      #DO NOT REMOVE THIS PRINT
       print(p)
     }
   },height=1000)
@@ -1547,7 +1684,7 @@ output$html_gold_table <- renderText({
       thou_dost_offend_me$max_time = round(thou_dost_offend_me$max_time,2)
       
       job_id = job_id()
-      html_offenders = "<table border=1>"
+      html_offenders = "<table class=\"table table-bordered table-striped\">"
       #worker_table$last_submit = as.character(worker_table$last_submit)
       thou_dost_offend_me = rbind(names(thou_dost_offend_me),
                                   thou_dost_offend_me)
@@ -1613,7 +1750,7 @@ output$html_gold_table <- renderText({
   
   
   flag_individual_workers <- reactive({
-    if ((is.null(input$files[1]) || is.na(input$files[1])) && input$job_id==0) {
+    if ((is.null(input$files[1]) || is.na(input$files[1])) && (input$get_file==0)){
       # User has not uploaded a file yet
       return(NULL)
     } else {
@@ -1626,10 +1763,10 @@ output$html_gold_table <- renderText({
         ids_to_reject = c()
         for (i in 1:length(potential_gets)) {
           if(input[[potential_gets[i]]] == 0) {
-            print(paste("this get", potential_gets[i], "has not been clicked yet"))
+            #print(paste("this get", potential_gets[i], "has not been clicked yet"))
             # int he future: remove from the flagged list
           } else {
-            print(paste("this get", potential_gets[i], "got CLICKED. Yayyyyyy!"))
+            #print(paste("this get", potential_gets[i], "got CLICKED. Yayyyyyy!"))
             ids_to_reject = c(ids_to_reject, potential_offenders[i])
           }
         }

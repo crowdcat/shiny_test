@@ -5,13 +5,17 @@
 require('shiny')
 require('rCharts')
 require('devtools')
+require('rworldmap')
 
 shinyUI(pageWithSidebar(
   headerPanel("Contributor Slice-orama 4000"),
   sidebarPanel(
-    numericInput("job_id", h4("Paste your job id here"), 0),
+    div(numericInput("job_id", h4("Paste your job id here"), 0), class="span7", align="left"),
+    br(),br(),
+    div(actionButton("get_file", "Get Data"), class="span5"),
+    br(),br(),
     p("No Progress? make sure the file has been generated in the job"),
-    h4("OR"),
+    h4("*** OR ***"),
     fileInput("files", h4("Select a full report:"), multiple=FALSE, 
               accept=c('text/csv', 'text/comma-separated-values,text/plain', '.csv')),
     h4("***"),
@@ -33,12 +37,22 @@ shinyUI(pageWithSidebar(
   mainPanel(
     tabsetPanel(
       tabPanel("Summary",
-               h4("Times:"),
-               uiOutput("summary_times"),
-               h4("10 Most Listed Countries:"),
-               uiOutput("summary_stats_country"),
-               h4("10 Most Listed Channels:"),
-               uiOutput("summary_stats_channel")),
+               div(h4("Times:"),
+                uiOutput("summary_times"), class="span8 offset1 well"),
+               br(), br(),
+               div(h4("Global Map of Judgments"), class="span8"),
+               div(plotOutput("worldGraph"), class="span10"),
+               div(h4("Most Judgments by Country:"),
+                   uiOutput("summary_stats_country"),
+                   p("*up to 10"), class="span5"),
+               div(h4("Most Judgments by Channel:"),
+                uiOutput("summary_stats_channel"), 
+                p("*up to 10"), class="span5"),
+               br(), br(),
+               
+               div(h4("Stacked Bar of Judgments by Channel"),
+                plotOutput("stackedGraph"), class="span10")
+               ),
       tabPanel("Contributor IDs Table",
                uiOutput("titleTextContributors"),
                selectInput(inputId = "sortby_chosen", label= "Sort By:",
@@ -106,9 +120,14 @@ shinyUI(pageWithSidebar(
                           h4("Total Number of Units"),
                           uiOutput("profileUnitCount"),
                           h4("Units Seen"),
+                          p("Random sample of 15 units"),
+                          checkboxInput(inputId="all_units_chosen",
+                                        label="Show all units"),
                           htmlOutput("html_unit_table"),
                           h4("Answer Distros"),
                           uiOutput("profileQuestionSelector"),
+                          p("*Graph's default order is by most common answers by Individual on non-Golds"),
+                          checkboxInput(inputId="units_order_chosen", label="Show most common answers by all"),
                           showOutput("profile_units_distros", "nvd3"),
                           htmlOutput("unitDistrosExplain"),
                           br()
@@ -117,9 +136,14 @@ shinyUI(pageWithSidebar(
                           h4("Total Number of Golds"),
                           uiOutput("profileGoldCount"),
                           h4("Golds Seen"),
+                          p("Random sample of 15 golds"),
+                          checkboxInput(inputId="all_golds_chosen",
+                                        label="Show all golds"),
                           htmlOutput("html_gold_table"),
                           h4("Gold Distros"),
                           uiOutput("profileQuestionSelectorGolds"),
+                          p("*Graph's default order is by most common answers by Individual on Golds"),
+                          checkboxInput(inputId="golds_order_chosen", label="Show most common answers by all on Golds"),
                           showOutput("profile_golds_distros", "nvd3"),
                           htmlOutput("goldDistrosExplain")),
                  tabPanel("Similar Workers",
@@ -149,7 +173,8 @@ shinyUI(pageWithSidebar(
                              "Channel" = "channel",
                              "Country" = "country",
                              "Untrusted" ="untrusted")),
-               showOutput("plot_workers", "nvd3")
+               showOutput("plot_workers", "nvd3"),
+               tags$style(type="text/css", ".nv-controlsWrap { visibility: hidden; }")
       )
       
     )
