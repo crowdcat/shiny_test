@@ -2,8 +2,9 @@ library(shiny)
 library(plyr)
 library(rCharts)
 shinyServer(function(input, output,session){
-  output$h1chart <- renderChart({
+  output$chart1 <- renderChart({
     h1 <- rCharts::Highcharts$new()
+    h1$chart(animation = F)
     h1$series(data = list(list(0,270),
                           list(11,270)), 
               type='line',draggable = T,
@@ -22,7 +23,24 @@ shinyServer(function(input, output,session){
               isThresholder = F,
               dragMin = 0)
     
-    h1$set(dom = "h1chart")
+    h1$plotOptions(
+      series = list(
+        cursor = 'ns-resize',
+        point = list(
+          events = list(
+            drop = "#! function() {
+              $('#report').html(
+                this.category + ' was set to ' + Highcharts.numberFormat(this.y, 2));
+            } !#"
+          )
+        )
+      ),
+      column = list(
+        stacking = 'normal'
+      )
+    )
+    
+    h1$set(dom = "chart1")
     return(h1)
   })
   output$selectedOut <- renderUI({

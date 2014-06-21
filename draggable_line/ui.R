@@ -2,7 +2,14 @@ library(shiny)
 library(plyr)
 library(rCharts)
 shinyUI(pageWithSidebar(
-  headerPanel(""),
+  headerPanel("",
+              tagList(
+                tags$head(
+                  tags$script(src="http://code.jquery.com/jquery-1.9.1.js"),
+                  tags$script(src="http://code.jquery.com/ui/1.10.3/jquery-ui.js")
+                )
+              )
+  ),
   sidebarPanel(
     wellPanel(
       h6("Change here should update plotband:"),
@@ -14,12 +21,7 @@ shinyUI(pageWithSidebar(
   ),
   mainPanel(
     HTML('<script type="text/javascript" src="draggable_functions.js"></script>'),
-    showOutput("h1chart","highcharts"),
-    tags$script('Shiny.addCustomMessageHandler("customMsg", function(bandOpts){
-     chartXAxis = $("#h1chart").highcharts().xAxis[0]
-     chartXAxis.removePlotBand()
-     chartXAxis.addPlotBand(bandOpts)
-   })')
-    
+    showOutput("chart1","highcharts")
   )
+  
 ))
