@@ -30,30 +30,55 @@
       thresholded = null,
       data = [],
       thresholdData = [];
+      megadata = [];
       
       $(dragPoint.series.chart.series).each(function(ind, ser) {
-        if (ser.options.type === 'column' && !ser.options.isThresholder) { /* default series */
-                                                                             thresholded = ser;
-                                                                           var len = ser.data.length; 
-                                                                           $(ser.data).each(function(ii, point){
-                                                                             if(data.length !== len  ){
-                                                                               data.push(point.y > dragPoint.y ? dragPoint.y : point.y);
-                                                                               
-                                                                               thresholdData.push(point.y > dragPoint.y ? point.y - dragPoint.y : 0);
+        if (ser.options.type === 'bubble' && !ser.options.isThresholder) { /* default series */
+                                                                          thresholded = ser;
+                                                                          var len = ser.data.length; 
+                                                                          $(ser.data).each(function(ii, point){
+                                                                            console.log('');
+                                                                            console.log("updating first series");
+                                                                            console.log(ii);
+                                                                            console.log('point.y' + point.y);
+                                                                            console.log('dragPoint.y' + dragPoint.y);
+                                                                            
+                                                                       
+                                                                            
+                                                    
+                                                                            // thresholdData.push(point.y > dragPoint.y ? point.y : null);
+                                                                           if ( point.y !== null) {
+                                                                           if (point.y > dragPoint.y) {
+                                                                               data[ii] = point.y;
+                                                                               thresholdData[ii] = null;
                                                                              } else {
-                                                                               thresholdData.push(data[ii] + point.y > dragPoint.y ? data[ii] + point.y - dragPoint.y : 0);
-                                                                               data[ii] = data[ii] + point.y > dragPoint.y ? dragPoint.y : data[ii] + point.y;
-                                                                               
-                                                                               
+                                                                               thresholdData[ii] = point.y;
+                                                                               data[ii] = null;
                                                                              }
-                                                                           });
-        } else if(ser.options.type === 'column' && ser.options.isThresholder) {
+                                                                           }
+                                                                             console.log('data[ii]' + data[ii]);
+                                                                             console.log('thresholdData[ii]' + thresholdData[ii]);
+                                                                      });
+        } else if(ser.options.type === 'bubble' && ser.options.isThresholder) {
+          console.log('updating second series');
           $(ser.data).each(function(ii, point){
-            data.push(point.y);
+            //data.push(point.y);
+            console.log('updating second series');
+                      if ( point.y !== null) {
+                        if (point.y > dragPoint.y) {
+                          data[ii] = point.y;
+                          thresholdData[ii] = null;
+                        } else {
+                          thresholdData[ii] = point.y;
+                          data[ii] = null;
+                       }
+                    }
           });
           thresholder = ser;
         }
       });
+      console.log('thresholdData  ',thresholdData);
+      console.log('data  ',data);
       if(thresholder && thresholded) {            thresholder.setData(thresholdData,false);
                                                   thresholded.setData(data,false);
       }
